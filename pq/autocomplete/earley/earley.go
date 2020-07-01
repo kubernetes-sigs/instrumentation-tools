@@ -55,7 +55,7 @@ type Earley struct {
 	words Tokens
 }
 
-func newEarleyParser(g Grammar) *Earley {
+func NewEarleyParser(g Grammar) *Earley {
 	newChart := initializeChart(g)
 	return &Earley{g: g, chart: newChart}
 }
@@ -179,4 +179,16 @@ func (p *Earley) PartialParse(tokens Tokens, chartIndex int) *StateSet {
 		}
 	}
 	return currStateSet
+}
+
+func (p *Earley) GetSuggestedTokenType(tokens Tokens) (types []ContextualToken) {
+	lastTokenPos := len(tokens) - 1
+	if lastTokenPos < 0 {
+		lastTokenPos = 0
+	}
+	p.ParseTokens(tokens)
+	suggestions := p.chart.GetValidTerminalTypesAtStateSet(lastTokenPos)
+	debug.Debugln(
+		"generating suggestions", tokens.Vals()[lastTokenPos], len(tokens), lastTokenPos, len(suggestions))
+	return suggestions
 }

@@ -81,5 +81,5 @@ var (
 		NewRule(BinaryExpression, Num, Arithmetic, Num),
 	)
 
-	PromQLParser = newEarleyParser(*promQLGrammar)
+	PromQLParser = NewEarleyParser(*promQLGrammar)
 )

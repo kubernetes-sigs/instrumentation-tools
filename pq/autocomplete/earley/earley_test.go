@@ -91,7 +91,7 @@ func TestEarleyChartStates(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		p := newEarleyParser(*promQLGrammar)
+		p := NewEarleyParser(*promQLGrammar)
 		inputWords := extractWords(tc.inputString)
 		p.words = inputWords
 		p.resizeChartIfNecessary(inputWords)
@@ -141,7 +141,7 @@ func TestEarleyPredict(t *testing.T) {
 		},
 	}
 
-	parser := newEarleyParser(*testGrammar)
+	parser := NewEarleyParser(*testGrammar)
 	for _, tc := range testCases {
 		stateSet := parser.chart.GetState(tc.chartIndex)
 		prevItemLength := len(stateSet.items)
@@ -196,7 +196,7 @@ func TestEarleyScan(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			parser := newEarleyParser(*testGrammar)
+			parser := NewEarleyParser(*testGrammar)
 			parser.resizeChart(tc.chartSize)
 
 			stateSet := parser.chart.GetState(1)
@@ -240,7 +240,7 @@ func TestEarleyComplete(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			parser := newEarleyParser(*testGrammar)
+			parser := NewEarleyParser(*testGrammar)
 			parser.resizeChart(tc.chartIndex + 1)
 
 			chart := parser.chart
