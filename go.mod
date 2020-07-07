@@ -12,6 +12,9 @@ replace (
 )
 
 require (
+	github.com/fatih/color v1.9.0
 	github.com/golang/protobuf v1.3.3
+	github.com/hokaccha/go-prettyjson v0.0.0-20190818114111-108c894c2c0e
 	github.com/prometheus/prometheus v1.8.2-0.20200324204105-12d53dde558e
+	gopkg.in/yaml.v2 v2.2.8
 )
