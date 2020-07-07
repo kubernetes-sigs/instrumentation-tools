@@ -82,4 +82,18 @@ var (
 	)
 
 	PromQLParser = NewEarleyParser(*promQLGrammar)
+
+	aggregators = map[string]string{
+		"sum":          "calculate sum over dimensions",
+		"max":          "select maximum over dimensions",
+		"min":          "select minimum over dimensions",
+		"avg":          "calculate the average over dimensions",
+		"stddev":       "calculate population standard deviation over dimensions",
+		"stdvar":       "calculate population standard variance over dimensions",
+		"count":        "count number of elements in the vector",
+		"count_values": "count number of elements with the same value",
+		"bottomk":      "smallest k elements by sample value",
+		"topk":         "largest k elements by sample value",
+		"quantile":     "calculate φ-quantile (0 ≤ φ ≤ 1) over dimensions",
+	}
 )

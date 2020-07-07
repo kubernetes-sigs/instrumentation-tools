@@ -17,6 +17,7 @@ limitations under the License.
 package earley
 
 import (
+	"sort"
 	"strings"
 
 	"k8s.io/instrumentation-tools/debug"
@@ -120,7 +121,15 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 					matches = append(matches, newMatch)
 				}
 			}
+		case AGGR_OP:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(aggregators), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "aggr-operation", aggregators[ao])
+				matches = append(matches, newMatch)
+			}
 		}
+		sort.Slice(matches, func(i, j int) bool {
+			return matches[i].GetValue() > matches[j].GetValue()
+		})
 	}
 	return matches
 }
