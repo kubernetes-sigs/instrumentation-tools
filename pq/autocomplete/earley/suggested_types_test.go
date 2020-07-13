@@ -17,6 +17,7 @@ limitations under the License.
 package earley
 
 import (
+	"github.com/golang/protobuf/proto"
 	"reflect"
 	"testing"
 )
