@@ -107,8 +107,8 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 				}
 			}
 		case METRIC_ID:
-			metricmatches := autocomplete.FilterPrefix(c.GetMetricNames(), autocompletePrefix, false)
-			for _, m := range metricmatches.List() {
+			metricMatches := autocomplete.FilterPrefix(c.GetMetricNames(), autocompletePrefix, false)
+			for _, m := range metricMatches.List() {
 				dims := c.GetStoredDimensionsForMetric(m).List()
 				newMatch := NewPartialMatch(m, "metric-id", strings.Join(dims, ","))
 				matches = append(matches, newMatch)

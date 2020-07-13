@@ -37,6 +37,7 @@ import (
 //           restructure the earley parser such that it takes a earleyStateSet
 //           representing the past state, and construct the next stateSet with an arbitrary
 //           symbol passed in).
+//noinspection GoNameStartsWithPackageName
 type EarleyChart interface {
 	States() []*StateSet
 	GetState(insertionOrderZeroIndexed int) *StateSet

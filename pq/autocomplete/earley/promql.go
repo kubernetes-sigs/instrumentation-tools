@@ -20,13 +20,14 @@ type terminalType string
 
 var (
 	// non-terminals
-	Expression         = NewNonTerminal("expression", true)
-	MetricExpression   = NewNonTerminal("metric-expression", false)
-	AggrExpression     = NewNonTerminal("aggr-expression", false)
-	LabelExpression    = NewNonTerminal("label-expression", false)
-	FuncCallExpression = NewNonTerminal("func-call-expression", false)
-	FuncArgs           = NewNonTerminal("func-args", false)
-	BinaryExpression   = NewNonTerminal("binary-expression", false)
+	Expression           = NewNonTerminal("expression", true)
+	MetricExpression     = NewNonTerminal("metric-expression", false)
+	AggrExpression       = NewNonTerminal("aggr-expression", false)
+	LabelsExpression     = NewNonTerminal("labels-expression", false)
+	LabelValueExpression = NewNonTerminal("label-value-expression", false)
+	AggrCallExpression   = NewNonTerminal("aggr-call-expression", false)
+	MetricLabelArgs      = NewNonTerminal("func-args", false)
+	BinaryExpression     = NewNonTerminal("binary-expression", false)
 	//AggrFuncParam   = NewNonTerminal("func-param", false) // sometimes optional, but sometimes necessary
 
 	// terminals
@@ -61,20 +62,24 @@ var (
 		NewRule(MetricExpression, MetricIdentifier),
 		NewRule(MetricExpression, MetricIdentifier),
 		// 2) a metric expression can optionally have a label expression
-		NewRule(MetricExpression, MetricIdentifier, LabelExpression),
+		NewRule(MetricExpression, MetricIdentifier, LabelValueExpression),
 
 		// AGGR EXPRESSIONS:
-		// 1) a metric expression can consist solely of a metric tokenType
-		NewRule(AggrExpression, AggregatorOp, FuncCallExpression),
-		NewRule(AggrExpression, AggregatorOp, AggregateKeyword, FuncCallExpression, FuncCallExpression),
+		// 1) a aggregation operation expression can consist solely of a metric tokenType
+		// sum(metric{label='value'})
+		NewRule(AggrExpression, AggregatorOp, AggrCallExpression, AggregateKeyword, LabelsExpression),
+		// sum by (label) (metric)
+		NewRule(AggrExpression, AggregatorOp, AggregateKeyword, LabelsExpression, AggrCallExpression),
+		NewRule(AggrCallExpression, LParen, MetricExpression, RParen),
 
-		NewRule(FuncCallExpression, LParen, MetricExpression, RParen),
-		// the commented rule below is only valid for actual funcs and grouping labels
-		//NewRule(FuncCallExpression, LParen, FuncArgs, RParen),
-		NewRule(FuncArgs, FuncArgs, Comma, Identifier),
-		NewRule(FuncArgs, Identifier),
 		// LABEL EXPRESSIONS:
-		NewRule(LabelExpression, LBrace, MetricLabelIdentifier, Operator, Str, RBrace),
+		NewRule(LabelsExpression, LParen, MetricLabelArgs, RParen),
+		// todo(han) it is also valid to have multiple targeted additional metric label
+		// todo(han) i.e. sum(metricname{label1="blah",label2="else"}) by (label3)
+		NewRule(MetricLabelArgs, MetricLabelArgs, Comma, MetricLabelIdentifier),
+		NewRule(MetricLabelArgs, MetricLabelIdentifier),
+
+		NewRule(LabelValueExpression, LBrace, MetricLabelIdentifier, Operator, Str, RBrace),
 
 		// BINARY EXPRESSIONS:
 		NewRule(BinaryExpression, BinaryExpression, Arithmetic, Num),

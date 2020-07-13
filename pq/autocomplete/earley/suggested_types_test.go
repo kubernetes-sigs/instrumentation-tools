@@ -19,8 +19,6 @@ package earley
 import (
 	"reflect"
 	"testing"
-
-	"github.com/golang/protobuf/proto"
 )
 
 func TestEarleyItems(t *testing.T) {
@@ -32,7 +30,7 @@ func TestEarleyItems(t *testing.T) {
 	}{
 		{
 			desc:                "shouldn't be completed",
-			rule:                NewRule(LabelExpression, LBrace, Identifier, Operator, Str, RBrace, Eof),
+			rule:                NewRule(LabelValueExpression, LBrace, Identifier, Operator, Str, RBrace, Eof),
 			rulePos:             0,
 			expectedIsCompleted: false,
 		},
@@ -170,6 +168,13 @@ func TestSuggestedTypes(t *testing.T) {
 			tokenPos:      4,
 			expectedTypes: []TokenType{METRIC_LABEL_SUBTYPE},
 			expectedMetric: proto.String("metric_name_one"),
+		},
+		{
+			name:         "suggests aggr kw",
+			inputString: `sum(metric_name_one)`,
+			tokenPos:      4,
+			expectedTypes: []TokenType{AGGR_KW},
+			//expectedMetric: proto.String("metric_name_one"),
 		},
 	}
 	for _, tc := range testCases {

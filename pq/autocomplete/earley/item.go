@@ -24,6 +24,7 @@ import (
 // EarleyItem represents A SINGLE possible parse path. More abstractly,
 // this represents a potential grammar rule which we can validly apply.
 // It is the basic unit of state set.
+//noinspection GoNameStartsWithPackageName
 type EarleyItem struct {
 	Rule    *GrammarRule
 	RulePos int // dot position
