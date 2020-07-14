@@ -125,8 +125,8 @@ func TestEarleyPredict(t *testing.T) {
 			},
 			chartIndex: 0,
 			expectedNewItems: []string{
-				"Rule(S) -> ◬M (0) (cause:predict) (tokensConsumed:0)",
-				"Rule(S) -> ◬S '+' M (0) (cause:predict) (tokensConsumed:0)",
+				"Rule(S) ->  ◬ M (0) (cause:predict) (tokensConsumed:0)",
+				"Rule(S) ->  ◬ S '+' M (0) (cause:predict) (tokensConsumed:0)",
 			},
 		},
 		{
@@ -145,7 +145,7 @@ func TestEarleyPredict(t *testing.T) {
 	for _, tc := range testCases {
 		stateSet := parser.chart.GetState(tc.chartIndex)
 		prevItemLength := len(stateSet.items)
-		parser.predict(tc.item, tc.chartIndex)
+		parser.predict(tc.item, tc.chartIndex, nil)
 		verifyStateSet(t, stateSet, tc.expectedNewItems, prevItemLength)
 	}
 
@@ -190,7 +190,7 @@ func TestEarleyScan(t *testing.T) {
 			token:            Tokhan{Type: "a"},
 			chartIndex:       0,
 			chartSize:        2,
-			expectedNewItems: []string{"Rule(T) -> 'a'◬ (0) (cause:scan) (tokensConsumed:1)"},
+			expectedNewItems: []string{"Rule(T) -> 'a' ◬  (0) (cause:scan) (tokensConsumed:1)"},
 		},
 	}
 
@@ -201,7 +201,7 @@ func TestEarleyScan(t *testing.T) {
 
 			stateSet := parser.chart.GetState(1)
 			prevItemLength := len(stateSet.items)
-			parser.scan(tc.item, tc.chartIndex, tc.token)
+			parser.scan(tc.item, tc.chartIndex, nil, tc.token)
 			verifyStateSet(t, stateSet, tc.expectedNewItems, prevItemLength)
 		})
 	}
@@ -224,7 +224,7 @@ func TestEarleyComplete(t *testing.T) {
 				cause:            SCAN_STATE,
 			},
 			chartIndex:      1,
-			expectedNewItem: []string{"Rule(M) -> T◬ (0) (cause:complete) (tokensConsumed:0)"},
+			expectedNewItem: []string{"Rule(M) -> T ◬  (0) (cause:complete) (tokensConsumed:0)"},
 		},
 		{
 			name: "Item has already been in the state set",
@@ -246,7 +246,7 @@ func TestEarleyComplete(t *testing.T) {
 			chart := parser.chart
 			set0 := chart.GetState(0)
 			// Add predict item M -> ◬ T to set 0
-			set0.items = append(set0.items, newPredictItem(testGrammar.rules[4], 0, nil))
+			set0.items = append(set0.items, newPredictItem(testGrammar.rules[4], 0, nil, nil))
 			set1 := chart.GetState(1)
 			// Add complete item M -> M ◬ * T to set 1
 			set1.items = append(set1.items, &EarleyItem{

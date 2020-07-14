@@ -25,6 +25,7 @@ const (
 
 // An Earley StateSet represents all possible rules at a given index in an Earley chart.
 type StateSet struct {
+	stateNo int
 	items   []*EarleyItem
 	itemSet map[uint64]bool
 }
@@ -58,6 +59,8 @@ func (s *StateSet) Add(item *EarleyItem) bool {
 		return false
 	}
 	s.itemSet[item.badhash()] = true
+	item.id.StateSetIndex = s.stateNo
+	item.id.ItemIndex = len(s.items)
 	s.items = append(s.items, item)
 	return true
 }

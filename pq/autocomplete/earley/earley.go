@@ -63,7 +63,7 @@ func NewEarleyParser(g Grammar) *Earley {
 // For every state in S(k) of the form (X → α • Y β, j)
 // (where j is the origin position as above), add (Y → • γ, k) to S(k)
 // for every production in the grammar with Y on the left-hand side (Y → γ).
-func (p *Earley) predict(state *EarleyItem, chartIndex int) {
+func (p *Earley) predict(state *EarleyItem, chartIndex int, fromItems []ItemId) {
 	nextSymbol := state.GetRightSymbolByRulePos().(nonTerminal)
 	recognizedRules := p.g.recognizedRules(nextSymbol)
 	currStateSet := p.chart.GetState(chartIndex)
@@ -72,7 +72,7 @@ func (p *Earley) predict(state *EarleyItem, chartIndex int) {
 	}
 	// Find all the rules for the Symbol put those rules to the current set
 	for _, r := range recognizedRules {
-		nextItem := newPredictItem(r, chartIndex, state.ctx)
+		nextItem := newPredictItem(r, chartIndex, fromItems, state.ctx)
 		if currStateSet.Add(nextItem) {
 			debug.Debugf("added %v\n", nextItem.String())
 		}
@@ -81,7 +81,7 @@ func (p *Earley) predict(state *EarleyItem, chartIndex int) {
 
 // If a is the next symbol in the input stream, for every state in S(k) of the
 // form (X → α • a β, j), add (X → α a • β, j) to S(k+1).
-func (p *Earley) scan(state *EarleyItem, chartIndex int, token Tokhan) {
+func (p *Earley) scan(state *EarleyItem, chartIndex int, fromItems []ItemId, token Tokhan) {
 	// abort though if we can't scan further
 	if chartIndex+1 >= p.chart.Length() || !state.DoesTokenTypeMatch(token) {
 		return
@@ -93,7 +93,7 @@ func (p *Earley) scan(state *EarleyItem, chartIndex int, token Tokhan) {
 	}
 	ctx.BuildContext(state.GetRightSymbolTypeByRulePos(), &token)
 
-	nextItem := newScanItem(state, chartIndex, ctx)
+	nextItem := newScanItem(state, chartIndex, fromItems, ctx)
 	debug.Debugf("Scanning next item : %v\n", nextItem)
 	// scanned item is added to next stateSet
 	nextSet := p.chart.GetState(chartIndex + 1)
@@ -108,7 +108,8 @@ func (p *Earley) complete(state *EarleyItem, chartIndex int) {
 	itemsToComplete := originalSet.findItemsToComplete(state.Rule.left)
 
 	for _, item := range itemsToComplete {
-		nextItem := newCompleteItem(&item)
+		fromItems := []ItemId{state.id, item.id}
+		nextItem := newCompleteItem(&item, fromItems)
 		if currStateSet.Add(nextItem) {
 			debug.Debugf("completed %v\n", nextItem.String())
 		}
@@ -132,6 +133,7 @@ func (p *Earley) resizeChart(size int) {
 // grammar, which simplifies our parsing logic considerably.
 func (p *Earley) Parse(input string) *earleyChart {
 	inputWords := extractWords(input)
+	p.chart.setInputWords(inputWords)
 	return p.ParseTokens(inputWords)
 }
 
@@ -141,42 +143,42 @@ func (p *Earley) Parse(input string) *earleyChart {
 func (p *Earley) ParseTokens(tokens Tokens) *earleyChart {
 	p.words = tokens
 	p.resizeChartIfNecessary(tokens)
-	// parse through all words
-	for stateIndex := 0; stateIndex <= len(tokens); stateIndex++ {
-		p.PartialParse(tokens, stateIndex)
+	// parse through all words, the last of the token is always Eof
+	for stateIndex := 0; stateIndex < len(tokens); stateIndex++ {
+		token := tokens[stateIndex]
+		p.PartialParse(token, stateIndex)
 		debug.Debugf("------\n%v\n------\n", p.chart.String())
 	}
 	return p.chart
 }
 
 // This is the incremental bit of our parser. We can basically feed in
-// a list of words (i.e. lexed tokens) and parse at a specific word index.
-func (p *Earley) PartialParse(tokens Tokens, chartIndex int) *StateSet {
+// the next token and parse at a specific word index.
+func (p *Earley) PartialParse(token Tokhan, chartIndex int) *StateSet {
 	debug.Debugf("------- starting partial parse %v\n", chartIndex)
-	p.words = tokens
+	//p.words = tokens
 	// we're going to assume here that we've correctly parsed prior to our index
-	p.resizeChartIfNecessary(tokens)
+	//p.resizeChartIfNecessary(tokens)
 	currStateSet := p.chart.GetState(chartIndex)
-	for _, token := range tokens {
-		setIndex := 0
-		for {
-			if setIndex >= len(currStateSet.GetStates()) {
-				break
-			}
-			state := currStateSet.items[setIndex]
-			if !state.isCompleted() {
-				// predict if current state isn't terminal
-				if !state.GetRightSymbolByRulePos().isTerminal() {
-					p.predict(state, chartIndex)
-				} else {
-					// Scan the next symbol which is terminal
-					p.scan(state, chartIndex, token)
-				}
-			} else { // end of rule, let's complete
-				p.complete(state, chartIndex)
-			}
-			setIndex++
+	setIndex := 0
+	for {
+		if setIndex >= len(currStateSet.GetStates()) {
+			break
 		}
+		item := currStateSet.items[setIndex]
+		fromItems := []ItemId{item.id}
+		if !item.isCompleted() {
+			// predict if current state isn't terminal
+			if !item.GetRightSymbolByRulePos().isTerminal() {
+				p.predict(item, chartIndex, fromItems)
+			} else {
+				// Scan the next symbol which is terminal
+				p.scan(item, chartIndex, fromItems, token)
+			}
+		} else { // end of rule, let's complete
+			p.complete(item, chartIndex)
+		}
+		setIndex++
 	}
 	return currStateSet
 }

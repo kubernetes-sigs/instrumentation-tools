@@ -26,26 +26,36 @@ import (
 // It is the basic unit of state set.
 //noinspection GoNameStartsWithPackageName
 type EarleyItem struct {
+	// id is the position of this item in the chart; e.g. [1,0] is the first item in Stateset 1
+	id      ItemId
 	Rule    *GrammarRule
 	RulePos int // dot position
 	// the position in the input at which the matching of the production began
-	originatingIndex        int
-	cause                   StateType // 'predict', 'scan' or 'complete'
+	originatingIndex int
+	cause            StateType // 'predict', 'scan' or 'complete'
+	// from is an array of the existing item that generate this item
+	from                    []ItemId
 	terminalSymbolsConsumed int
 	ctx                     *completionContext
 }
 
-func newPredictItem(r *GrammarRule, index int, ctx *completionContext) *EarleyItem {
+type ItemId struct {
+	StateSetIndex int
+	ItemIndex     int
+}
+
+func newPredictItem(r *GrammarRule, index int, from []ItemId, ctx *completionContext) *EarleyItem {
 	return &EarleyItem{
 		Rule:             r,
 		RulePos:          0,
 		originatingIndex: index,
 		cause:            PREDICT_STATE,
 		ctx:              ctx,
+		from:             from,
 	}
 }
 
-func newScanItem(sourceState *EarleyItem, index int, ctx *completionContext) *EarleyItem {
+func newScanItem(sourceState *EarleyItem, index int, from []ItemId, ctx *completionContext) *EarleyItem {
 	return &EarleyItem{
 		Rule:                    sourceState.Rule,
 		RulePos:                 sourceState.RulePos + 1,
@@ -53,10 +63,11 @@ func newScanItem(sourceState *EarleyItem, index int, ctx *completionContext) *Ea
 		ctx:                     ctx,
 		terminalSymbolsConsumed: sourceState.terminalSymbolsConsumed + 1,
 		cause:                   SCAN_STATE,
+		from:                    from,
 	}
 }
 
-func newCompleteItem(sourceState *EarleyItem) *EarleyItem {
+func newCompleteItem(sourceState *EarleyItem, from []ItemId) *EarleyItem {
 	return &EarleyItem{
 		Rule:                    sourceState.Rule,
 		RulePos:                 sourceState.RulePos + 1,
@@ -64,6 +75,7 @@ func newCompleteItem(sourceState *EarleyItem) *EarleyItem {
 		terminalSymbolsConsumed: sourceState.terminalSymbolsConsumed,
 		ctx:                     sourceState.ctx,
 		cause:                   COMPLETE_STATE,
+		from:                    from,
 	}
 }
 
@@ -73,7 +85,16 @@ func (item *EarleyItem) String() string {
 	for i, r := range item.Rule.right {
 		rightStrings[i] = r.String()
 	}
-	return fmt.Sprintf("Rule(%v) -> %v%v%v (%d) (cause:%v) (tokensConsumed:%v)\n",
+
+	fromStr := "root"
+	if item.from != nil {
+		fromStrings := make([]string, len(item.from))
+		for i, r := range item.from {
+			fromStrings[i] = fmt.Sprintf("S[%d][%d]", r.StateSetIndex, r.ItemIndex)
+		}
+		fromStr = strings.Join(fromStrings, ",")
+	}
+	return fmt.Sprintf("Rule(%v) -> %v %v %v (%d) (cause:%v) (tokensConsumed:%v) (from: %v)\n",
 		item.Rule.left.String(),
 		strings.Join(rightStrings[0:item.RulePos], " "),
 		Cursor,
@@ -81,6 +102,7 @@ func (item *EarleyItem) String() string {
 		item.originatingIndex,
 		item.cause,
 		item.terminalSymbolsConsumed,
+		fromStr,
 	)
 }
 

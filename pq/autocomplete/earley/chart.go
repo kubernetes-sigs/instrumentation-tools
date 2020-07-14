@@ -45,14 +45,17 @@ type EarleyChart interface {
 }
 
 type earleyChart struct {
-	state []*StateSet
+	inputWords Tokens
+	state      []*StateSet
 }
 
 func initializeChart(g Grammar) *earleyChart {
+	initialSet := g.initialStateSet()
+	initialSet.stateNo = 0
 	initialSets := []*StateSet{
-		g.initialStateSet(),
+		initialSet,
 	}
-	return &earleyChart{initialSets}
+	return &earleyChart{nil, initialSets}
 }
 
 func (c *earleyChart) Length() int {
@@ -67,6 +70,10 @@ func (c *earleyChart) GetState(insertionOrderZeroIndexed int) *StateSet {
 		return c.state[insertionOrderZeroIndexed]
 	}
 	return nil
+}
+
+func (c *earleyChart) setInputWords(t Tokens) {
+	c.inputWords = t
 }
 
 func (c *earleyChart) GetValidTerminalTypesAtStateSet(wordIndex int) (types []ContextualToken) {
@@ -110,16 +117,26 @@ func (c *earleyChart) GetValidTerminalTypesAtStateSet(wordIndex int) (types []Co
 func (c *earleyChart) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("earleyChart.String()\n")
+	sb.WriteString(fmt.Sprint("Input word: ", strings.Join(c.inputWords.Vals(), ", "), "\n"))
+
+	inputTokenTypes := c.inputWords.Types()
 	for i, s := range c.state {
-		sb.WriteString(fmt.Sprint(i, " ", s, "\n"))
+		currentInput := fmt.Sprintf("%v %v %v", strings.Join(inputTokenTypes[0:i], " "), Cursor, strings.Join(inputTokenTypes[i:], " "))
+		sb.WriteString(fmt.Sprint("State", " ", i, " ", currentInput, "\n"))
+		for j, item := range s.items {
+			sb.WriteString(fmt.Sprint(j, " ", item.String()))
+		}
+		sb.WriteString("\n")
 	}
 	return sb.String()
 }
 
 func (c *earleyChart) append(set *StateSet) {
+	set.stateNo = len(c.state)
 	c.state = append(c.state, set)
 }
 func (c *earleyChart) putAt(index int, set *StateSet) {
+	set.stateNo = index
 	c.state[index] = set
 }
 

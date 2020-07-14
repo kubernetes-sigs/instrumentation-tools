@@ -35,6 +35,14 @@ func (ws Tokens) Vals() []string {
 	}
 	return v
 }
+
+func (ws Tokens) Types() []string {
+	v := make([]string, len(ws))
+	for i, w := range ws {
+		v[i] = string(w.Type)
+	}
+	return v
+}
 func (ws Tokens) Print() {
 	for _, w := range ws {
 		debug.Debugln(w.String())
