@@ -183,7 +183,7 @@ func mapParserItemTypeToTokhanType(item parser.Item) TokenType {
 	case t == parser.LEFT_PAREN:
 		return LEFT_PAREN
 	case t == parser.RIGHT_PAREN:
-		return RIGHT_BRACE
+		return RIGHT_PAREN
 	case t == parser.ADD, t == parser.SUB, t == parser.MUL, t == parser.DIV:
 		return ARITHMETIC
 	case t == parser.COMMA:

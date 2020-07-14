@@ -93,7 +93,7 @@ func (p *Earley) scan(state *EarleyItem, chartIndex int, fromItems []ItemId, tok
 	}
 	ctx.BuildContext(state.GetRightSymbolTypeByRulePos(), &token)
 
-	nextItem := newScanItem(state, chartIndex, fromItems, ctx)
+	nextItem := newScanItem(state, state.originatingIndex, fromItems, ctx)
 	debug.Debugf("Scanning next item : %v\n", nextItem)
 	// scanned item is added to next stateSet
 	nextSet := p.chart.GetState(chartIndex + 1)

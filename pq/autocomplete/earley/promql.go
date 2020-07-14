@@ -70,6 +70,7 @@ var (
 		NewRule(AggrExpression, AggregatorOp, AggrCallExpression, AggregateKeyword, LabelsExpression),
 		// sum by (label) (metric)
 		NewRule(AggrExpression, AggregatorOp, AggregateKeyword, LabelsExpression, AggrCallExpression),
+		NewRule(AggrExpression, AggregatorOp, AggrCallExpression, AggregateKeyword),
 		NewRule(AggrCallExpression, LParen, MetricExpression, RParen),
 
 		// LABEL EXPRESSIONS:

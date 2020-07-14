@@ -52,10 +52,10 @@ func TestEarleyItems(t *testing.T) {
 
 func TestSuggestedTypes(t *testing.T) {
 	testCases := []struct {
-		name          string
-		inputString   string
-		tokenPos      int
-		expectedTypes []TokenType
+		name           string
+		inputString    string
+		tokenPos       int
+		expectedTypes  []TokenType
 		expectedMetric *string
 	}{
 		{
@@ -89,39 +89,39 @@ func TestSuggestedTypes(t *testing.T) {
 			expectedTypes: []TokenType{NUM},
 		},
 		{
-			name:          "Having consumed an ID, we should recommend a brace (paren in the future though) and EOF",
-			inputString:   "metric_name{label=",
-			tokenPos:      1,
-			expectedTypes: []TokenType{EOF, LEFT_BRACE},
+			name:           "Having consumed an ID, we should recommend a brace (paren in the future though) and EOF",
+			inputString:    "metric_name{label=",
+			tokenPos:       1,
+			expectedTypes:  []TokenType{EOF, LEFT_BRACE},
 			expectedMetric: proto.String("metric_name"),
 		},
 
 		{
-			name:          "Having consumed an left brace, we should recommend an ID",
-			inputString:   "metric_name{label=",
-			tokenPos:      2,
-			expectedTypes: []TokenType{METRIC_LABEL_SUBTYPE},
+			name:           "Having consumed an left brace, we should recommend an ID",
+			inputString:    "metric_name{label=",
+			tokenPos:       2,
+			expectedTypes:  []TokenType{METRIC_LABEL_SUBTYPE},
 			expectedMetric: proto.String("metric_name"),
 		},
 		{
-			name:          "Having consumed a label, we should recommend an OPERATOR",
-			inputString:   "metric_name{label=",
-			tokenPos:      3,
-			expectedTypes: []TokenType{OPERATOR},
+			name:           "Having consumed a label, we should recommend an OPERATOR",
+			inputString:    "metric_name{label=",
+			tokenPos:       3,
+			expectedTypes:  []TokenType{OPERATOR},
 			expectedMetric: proto.String("metric_name"),
 		},
 		{
-			name:          "Having consumed an operator, we should recommend a string",
-			inputString:   "metric_name{label=",
-			tokenPos:      4,
-			expectedTypes: []TokenType{STRING},
+			name:           "Having consumed an operator, we should recommend a string",
+			inputString:    "metric_name{label=",
+			tokenPos:       4,
+			expectedTypes:  []TokenType{STRING},
 			expectedMetric: proto.String("metric_name"),
 		},
 		{
-			name:          "Having consumed a labelvalue, we should recommend a closing brace",
-			inputString:   "metric_name{label='asdf'",
-			tokenPos:      5,
-			expectedTypes: []TokenType{RIGHT_BRACE},
+			name:           "Having consumed a labelvalue, we should recommend a closing brace",
+			inputString:    "metric_name{label='asdf'",
+			tokenPos:       5,
+			expectedTypes:  []TokenType{RIGHT_BRACE},
 			expectedMetric: proto.String("metric_name"),
 		},
 		{
@@ -137,17 +137,17 @@ func TestSuggestedTypes(t *testing.T) {
 			expectedTypes: []TokenType{METRIC_ID},
 		},
 		{
-			name:          "If we detect an aggregation op and opening paren, we should close the func or label select",
-			inputString:   "sum(metric_name",
-			tokenPos:      3,
-			expectedTypes: []TokenType{RIGHT_PAREN, LEFT_BRACE},
+			name:           "If we detect an aggregation op and opening paren, we should close the func or label select",
+			inputString:    "sum(metric_name",
+			tokenPos:       3,
+			expectedTypes:  []TokenType{RIGHT_PAREN, LEFT_BRACE},
 			expectedMetric: proto.String("metric_name"),
 		},
 		{
-			name:          "should return metric label",
-			inputString:   "sum(metric_name_one{",
-			tokenPos:      4,
-			expectedTypes: []TokenType{METRIC_LABEL_SUBTYPE},
+			name:           "should return metric label",
+			inputString:    "sum(metric_name_one{",
+			tokenPos:       4,
+			expectedTypes:  []TokenType{METRIC_LABEL_SUBTYPE},
 			expectedMetric: proto.String("metric_name_one"),
 		},
 		{
@@ -157,25 +157,25 @@ func TestSuggestedTypes(t *testing.T) {
 			expectedTypes: []TokenType{METRIC_ID},
 		},
 		{
-			name:          "should return metric label subtype",
-			inputString:   "metric_name{",
-			tokenPos:      2,
-			expectedTypes: []TokenType{METRIC_LABEL_SUBTYPE},
+			name:           "should return metric label subtype",
+			inputString:    "metric_name{",
+			tokenPos:       2,
+			expectedTypes:  []TokenType{METRIC_LABEL_SUBTYPE},
 			expectedMetric: proto.String("metric_name"),
 		},
 		{
-			name:          "should return metric label subtype",
-			inputString: `sum(metric_name_one{`,
-			tokenPos:      4,
-			expectedTypes: []TokenType{METRIC_LABEL_SUBTYPE},
+			name:           "should return metric label subtype",
+			inputString:    `sum(metric_name_one{`,
+			tokenPos:       4,
+			expectedTypes:  []TokenType{METRIC_LABEL_SUBTYPE},
 			expectedMetric: proto.String("metric_name_one"),
 		},
 		{
-			name:         "suggests aggr kw",
-			inputString: `sum(metric_name_one)`,
-			tokenPos:      4,
-			expectedTypes: []TokenType{AGGR_KW},
-			//expectedMetric: proto.String("metric_name_one"),
+			name:           "suggests aggr kw",
+			inputString:    `sum(metric_name_one)`,
+			tokenPos:       4,
+			expectedTypes:  []TokenType{AGGR_KW},
+			expectedMetric: proto.String("metric_name_one"),
 		},
 	}
 	for _, tc := range testCases {
