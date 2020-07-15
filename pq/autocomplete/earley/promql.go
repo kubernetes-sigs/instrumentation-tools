@@ -60,17 +60,16 @@ var (
 		// METRIC EXPRESSIONS:
 		// 1) a metric expression can consist solely of a metric tokenType
 		NewRule(MetricExpression, MetricIdentifier),
-		NewRule(MetricExpression, MetricIdentifier),
 		// 2) a metric expression can optionally have a label expression
 		NewRule(MetricExpression, MetricIdentifier, LabelValueExpression),
 
 		// AGGR EXPRESSIONS:
 		// 1) a aggregation operation expression can consist solely of a metric tokenType
-		// sum(metric{label='value'})
+		// sum(metric) by (label1)
 		NewRule(AggrExpression, AggregatorOp, AggrCallExpression, AggregateKeyword, LabelsExpression),
 		// sum by (label) (metric)
 		NewRule(AggrExpression, AggregatorOp, AggregateKeyword, LabelsExpression, AggrCallExpression),
-		NewRule(AggrExpression, AggregatorOp, AggrCallExpression, AggregateKeyword),
+		// '(metric{label="blah"})'
 		NewRule(AggrCallExpression, LParen, MetricExpression, RParen),
 
 		// LABEL EXPRESSIONS:
