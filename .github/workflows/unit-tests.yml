@@ -23,7 +23,7 @@ jobs:
       uses: actions/setup-go@v2.1.0
       with:
         # The Go version to download (if necessary) and use. Supports semver spec and ranges.
-        go-version: go1.14.1
+        go-version: '1.14'
 
 #     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
