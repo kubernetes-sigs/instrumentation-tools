@@ -62,6 +62,22 @@ func (ws Tokens) Last() Tokhan {
 	return ws[len(ws)-2]
 }
 
+func (ws Tokens) Compare(tks2 Tokens) int {
+	i := 0
+	for i, t := range ws {
+		// return positive i if ws and tks2 have partial overlap
+		if i >= len(tks2) || !t.equals(tks2[i]) {
+			return i
+		}
+	}
+	// return negative i if tks2 covers ws
+	if len(tks2) > len(ws) {
+		return 0 - i
+	}
+	// return 0 if they are equal
+	return 0
+}
+
 type TypedToken interface {
 	GetTokenType() TokenType
 }
@@ -109,6 +125,10 @@ func (t Tokhan) String() string {
 		t.StartPos,
 		t.EndPos,
 	)
+}
+
+func (t Tokhan) equals(t2 Tokhan) bool {
+	return t.Val == t2.Val && t.StartPos == t2.StartPos && t.EndPos == t2.EndPos
 }
 
 func extractWords(query string) Tokens {

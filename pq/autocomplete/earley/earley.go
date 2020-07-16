@@ -138,7 +138,7 @@ func (p *Earley) Parse(input string) *earleyChart {
 
 // ParseTokens parses the full input tokens from beginning
 func (p *Earley) ParseTokens(tokens Tokens) *earleyChart {
-	p.chart.resetChart()
+	p.chart.resetChartBeforeIndex(0)
 	p.PartialParse(tokens, 0)
 	debug.Debugf("------\n%v\n------\n", p.chart.String())
 	return p.chart
@@ -186,8 +186,27 @@ func (p *Earley) GetSuggestedTokenType(tokens Tokens) (types []ContextualToken) 
 	if lastTokenPos < 0 {
 		lastTokenPos = 0
 	}
-	// Todo:(yuchen) use partialParse for incrementally parsing
-	p.ParseTokens(tokens)
+
+	if p.words == nil || len(p.words) == 0 || len(tokens) == 0 || !p.words[0].equals(tokens[0]) {
+		p.ParseTokens(tokens)
+	} else {
+		result := p.words.Compare(tokens)
+
+		if result > 0 {
+			// prevWords and input words have partial overlap, truncate the current chart and partially
+			// parse the unparsed tokens
+			p.chart.resetChartBeforeIndex(result)
+			p.words = p.words[:result]
+			p.PartialParse(tokens[result:], result)
+		} else if result < 0 {
+			// input fully covers previous words, continue parsing from the unparsed word
+			result = 0 - result
+			p.PartialParse(tokens[result:], result)
+		} else {
+			// No further parsing needed if input tokens is exactly the previous input
+		}
+	}
+
 	suggestions := p.chart.GetValidTerminalTypesAtStateSet(lastTokenPos)
 	debug.Debugln(
 		"generating suggestions", tokens.Vals()[lastTokenPos], len(tokens), lastTokenPos, len(suggestions))

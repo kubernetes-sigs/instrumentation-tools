@@ -80,28 +80,33 @@ func TestEndToEndAutoCompletion(t *testing.T) {
 	index := NewTestIndex()
 	index.LoadMetrics(initialMetricsString, time.Now())
 	testCases := []struct {
-		desc string
-		query string
+		desc            string
+		query           string
 		expectedMatches sets.String
 	}{
 		{
-			desc: "completes on metric name in aggregation context",
-			query: `sum(metric_name_o`,
+			desc:            "completes on metric name in aggregation context",
+			query:           `sum(metric_name_o`,
 			expectedMatches: sets.NewString("metric_name_one"),
 		},
 		{
-			desc: "completes on metric label in aggregation context",
-			query: `sum(metric_name_one{`,
+			desc:            "completes on metric label in aggregation context",
+			query:           `sum(metric_name_one{`,
 			expectedMatches: sets.NewString("dima", "dimb"),
 		},
 		{
-			desc: "completes on metric name",
-			query: `metric_name`,
+			desc:            "completes on aggregation keywords",
+			query:           `sum(metric_name_one)`,
+			expectedMatches: sets.StringKeySet(aggregateKeywords),
+		},
+		{
+			desc:            "completes on metric name",
+			query:           `metric_name`,
 			expectedMatches: sets.NewString("metric_name_one", "metric_name_two"),
 		},
 		{
-			desc: "completes on empty string",
-			query: ``,
+			desc:            "completes on empty string",
+			query:           ``,
 			expectedMatches: sets.NewString("metric_name_one", "metric_name_two").Union(sets.StringKeySet(aggregators)),
 		},
 	}
