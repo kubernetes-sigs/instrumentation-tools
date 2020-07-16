@@ -101,4 +101,16 @@ var (
 		"topk":         "largest k elements by sample value",
 		"quantile":     "calculate φ-quantile (0 ≤ φ ≤ 1) over dimensions",
 	}
+
+	// Todo:(yuchen) add the description for aggr_kw
+	aggregateKeywords = map[string]string{
+		"offset":      "",
+		"by":          "",
+		"without":     "",
+		"on":          "",
+		"ignoring":    "",
+		"group_left":  "",
+		"group_right": "",
+		"bool":        "",
+	}
 )

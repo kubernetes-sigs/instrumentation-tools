@@ -58,6 +58,12 @@ func initializeChart(g Grammar) *earleyChart {
 	return &earleyChart{nil, initialSets}
 }
 
+// truncate the stateset and keep the initial set
+func (c *earleyChart) resetChart() {
+	c.inputWords = nil
+	c.state = c.state[:1]
+}
+
 func (c *earleyChart) Length() int {
 	return len(c.state)
 }
