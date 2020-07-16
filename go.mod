@@ -1,4 +1,4 @@
-module k8s.io/instrumentation-tools
+module sigs.k8s.io/instrumentation-tools
 
 go 1.14
 
@@ -12,9 +12,15 @@ replace (
 )
 
 require (
+	github.com/c-bata/go-prompt v0.2.4-0.20200321140817-d043be076398
 	github.com/fatih/color v1.9.0
+	github.com/gdamore/tcell v1.3.0
 	github.com/golang/protobuf v1.3.3
 	github.com/hokaccha/go-prettyjson v0.0.0-20190818114111-108c894c2c0e
+	github.com/mattn/go-runewidth v0.0.4
+	github.com/onsi/ginkgo v1.11.0
+	github.com/onsi/gomega v1.7.0
+	github.com/pkg/term v0.0.0-20200520122047-c3ffed290a03 // indirect
 	github.com/prometheus/prometheus v1.8.2-0.20200324204105-12d53dde558e
 	gopkg.in/yaml.v2 v2.2.8
 )
