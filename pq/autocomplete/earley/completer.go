@@ -126,6 +126,11 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 				newMatch := NewPartialMatch(ao, "aggr-operation", aggregators[ao])
 				matches = append(matches, newMatch)
 			}
+		case AGGR_KW:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(aggregateKeywords), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "aggr-keyword", aggregateKeywords[ao])
+				matches = append(matches, newMatch)
+			}
 		}
 		sort.Slice(matches, func(i, j int) bool {
 			return matches[i].GetValue() > matches[j].GetValue()

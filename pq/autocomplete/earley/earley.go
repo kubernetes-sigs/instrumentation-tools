@@ -133,54 +133,52 @@ func (p *Earley) resizeChart(size int) {
 // grammar, which simplifies our parsing logic considerably.
 func (p *Earley) Parse(input string) *earleyChart {
 	inputWords := extractWords(input)
-	p.chart.setInputWords(inputWords)
 	return p.ParseTokens(inputWords)
 }
 
-// Parse parses the full input string. It first tokenizes the input
-// string and then uses those tokens as atomic units in our
-// grammar, which simplifies our parsing logic considerably.
+// ParseTokens parses the full input tokens from beginning
 func (p *Earley) ParseTokens(tokens Tokens) *earleyChart {
-	p.words = tokens
-	p.resizeChartIfNecessary(tokens)
-	// parse through all words, the last of the token is always Eof
-	for stateIndex := 0; stateIndex < len(tokens); stateIndex++ {
-		token := tokens[stateIndex]
-		p.PartialParse(token, stateIndex)
-		debug.Debugf("------\n%v\n------\n", p.chart.String())
-	}
+	p.chart.resetChartBeforeIndex(0)
+	p.PartialParse(tokens, 0)
+	debug.Debugf("------\n%v\n------\n", p.chart.String())
 	return p.chart
 }
 
 // This is the incremental bit of our parser. We can basically feed in
-// the next token and parse at a specific word index.
-func (p *Earley) PartialParse(token Tokhan, chartIndex int) *StateSet {
+// a list of words (i.e. lexed tokens) and parse at a specific word index.
+func (p *Earley) PartialParse(tokens Tokens, chartIndex int) *earleyChart {
 	debug.Debugf("------- starting partial parse %v\n", chartIndex)
-	//p.words = tokens
 	// we're going to assume here that we've correctly parsed prior to our index
-	//p.resizeChartIfNecessary(tokens)
+	p.words = append(p.words, tokens...)
+	p.resizeChartIfNecessary(p.words)
+	p.chart.setInputWords(p.words)
 	currStateSet := p.chart.GetState(chartIndex)
-	setIndex := 0
-	for {
-		if setIndex >= len(currStateSet.GetStates()) {
-			break
-		}
-		item := currStateSet.items[setIndex]
-		fromItems := []ItemId{item.id}
-		if !item.isCompleted() {
-			// predict if current state isn't terminal
-			if !item.GetRightSymbolByRulePos().isTerminal() {
-				p.predict(item, chartIndex, fromItems)
-			} else {
-				// Scan the next symbol which is terminal
-				p.scan(item, chartIndex, fromItems, token)
+	for _, token := range tokens {
+		setIndex := 0
+		for {
+			if setIndex >= len(currStateSet.GetStates()) {
+				break
 			}
-		} else { // end of rule, let's complete
-			p.complete(item, chartIndex)
+			item := currStateSet.items[setIndex]
+			fromItems := []ItemId{item.id}
+			if !item.isCompleted() {
+				// predict if current state isn't terminal
+				if !item.GetRightSymbolByRulePos().isTerminal() {
+					p.predict(item, chartIndex, fromItems)
+				} else {
+					// Scan the next symbol which is terminal
+					p.scan(item, chartIndex, fromItems, token)
+				}
+			} else { // end of rule, let's complete
+				p.complete(item, chartIndex)
+			}
+			setIndex++
 		}
-		setIndex++
+		chartIndex++
+		currStateSet = p.chart.GetState(chartIndex)
+		debug.Debugf("------\n%v\n------\n", p.chart.String())
 	}
-	return currStateSet
+	return p.chart
 }
 
 func (p *Earley) GetSuggestedTokenType(tokens Tokens) (types []ContextualToken) {
@@ -188,7 +186,27 @@ func (p *Earley) GetSuggestedTokenType(tokens Tokens) (types []ContextualToken) 
 	if lastTokenPos < 0 {
 		lastTokenPos = 0
 	}
-	p.ParseTokens(tokens)
+
+	if p.words == nil || len(p.words) == 0 || len(tokens) == 0 || !p.words[0].equals(tokens[0]) {
+		p.ParseTokens(tokens)
+	} else {
+		result := p.words.Compare(tokens)
+
+		if result > 0 {
+			// prevWords and input words have partial overlap, truncate the current chart and partially
+			// parse the unparsed tokens
+			p.chart.resetChartBeforeIndex(result)
+			p.words = p.words[:result]
+			p.PartialParse(tokens[result:], result)
+		} else if result < 0 {
+			// input fully covers previous words, continue parsing from the unparsed word
+			result = 0 - result
+			p.PartialParse(tokens[result:], result)
+		} else {
+			// No further parsing needed if input tokens is exactly the previous input
+		}
+	}
+
 	suggestions := p.chart.GetValidTerminalTypesAtStateSet(lastTokenPos)
 	debug.Debugln(
 		"generating suggestions", tokens.Vals()[lastTokenPos], len(tokens), lastTokenPos, len(suggestions))

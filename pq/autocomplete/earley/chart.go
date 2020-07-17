@@ -55,7 +55,13 @@ func initializeChart(g Grammar) *earleyChart {
 	initialSets := []*StateSet{
 		initialSet,
 	}
-	return &earleyChart{nil, initialSets}
+	return &earleyChart{[]Tokhan{}, initialSets}
+}
+
+// truncate the stateset and keep the stateset before index
+func (c *earleyChart) resetChartBeforeIndex(index int) {
+	c.inputWords = c.inputWords[:index]
+	c.state = c.state[:index+1]
 }
 
 func (c *earleyChart) Length() int {

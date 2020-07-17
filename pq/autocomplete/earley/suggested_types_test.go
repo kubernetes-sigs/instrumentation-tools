@@ -207,6 +207,75 @@ func TestSuggestedTypes(t *testing.T) {
 	}
 }
 
+func TestPartialParse(t *testing.T) {
+	testCases := []struct {
+		name          string
+		prevInput     string
+		newInput      string
+		expectedTypes []TokenType
+	}{
+		{
+			"new input is same as previous input",
+			"sum(metric_name_one",
+			"sum(metric_name_one",
+			[]TokenType{RIGHT_PAREN, LEFT_BRACE},
+		},
+		{
+			"new input is empty",
+			"sum(metric_name_one",
+			"",
+			[]TokenType{METRIC_ID, NUM, AGGR_OP},
+		},
+		{
+			"previous input is empty",
+			"",
+			"sum(metric_name_one",
+			[]TokenType{RIGHT_PAREN, LEFT_BRACE},
+		},
+		{
+			"previous input and new input are different from beginning",
+			"metric_name{label=",
+			"sum(metric_name_one",
+			[]TokenType{RIGHT_PAREN, LEFT_BRACE},
+		},
+		{
+			"previous input and new input are partially same",
+			"sum(metric_name_one{",
+			"sum(metric_name_one)",
+			[]TokenType{AGGR_KW},
+		},
+		{
+			"new input covers previous input",
+			"sum(metric_name_one",
+			"sum(metric_name_one)",
+			[]TokenType{AGGR_KW},
+		},
+		{
+			"previous input covers new input",
+			"sum(metric_name_one{",
+			"sum(metric_name_one",
+			[]TokenType{RIGHT_PAREN, LEFT_BRACE},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := NewEarleyParser(*promQLGrammar)
+			p.Parse(tc.prevInput)
+			tokens := extractWords(tc.newInput)
+			validTypes := p.GetSuggestedTokenType(tokens)
+
+			var tknTypes []TokenType
+			for _, ct := range validTypes {
+				tknTypes = append(tknTypes, ct.TokenType)
+			}
+			if !reflect.DeepEqual(tknTypes, tc.expectedTypes) {
+				t.Errorf("\nGot %v, expected %v\n", validTypes, tc.expectedTypes)
+			}
+		})
+	}
+}
+
 func safeRead(sp *string) string {
 	if sp == nil {
 		return ""
