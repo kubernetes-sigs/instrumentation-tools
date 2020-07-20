@@ -17,7 +17,6 @@ limitations under the License.
 package earley
 
 import (
-	"github.com/golang/protobuf/proto"
 	"reflect"
 	"testing"
 )
@@ -50,159 +49,109 @@ func TestEarleyItems(t *testing.T) {
 	}
 }
 
-func TestSuggestedTypes(t *testing.T) {
+func TestCompletionContext(t *testing.T) {
 	testCases := []struct {
 		name           string
 		inputString    string
-		tokenPos       int
-		expectedTypes  []TokenType
 		expectedMetric *string
+		expectedLabels *string
+	}{
+		//	Todo(yuchen): add test cases
+	}
+
+	for _, tc := range testCases {
+		p := NewEarleyParser(*promQLGrammar)
+		tokens := extractWords(tc.inputString)
+		validTypes := p.GetSuggestedTokenType(tokens)
+
+		var metricName *string
+		for _, ct := range validTypes {
+			if ct.ctx != nil {
+				if ct.ctx.metric != nil {
+					metricName = ct.ctx.metric
+				}
+			}
+		}
+		t.Errorf("Got %v, Expected metric in context :%v ",
+			safeRead(metricName),
+			safeRead(tc.expectedMetric))
+	}
+}
+
+func TestSuggestedTypes(t *testing.T) {
+	testCases := []struct {
+		name              string
+		inputString       string
+		tokenPosList      []int
+		expectedTypesList [][]TokenType
 	}{
 		{
-			name:          "If we've consumed zero tokens, then we should suggest",
-			inputString:   "blah",
-			tokenPos:      0,
-			expectedTypes: []TokenType{METRIC_ID, NUM, AGGR_OP},
+			name:              "If we've consumed zero tokens, then we should suggest",
+			inputString:       "blah",
+			tokenPosList:      []int{0},
+			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP}},
 		},
 		{
-			name:          "If we have an empty string, then we should suggest",
-			inputString:   "",
-			tokenPos:      0,
-			expectedTypes: []TokenType{METRIC_ID, NUM, AGGR_OP},
+			name:              "If we have an empty string, then we should suggest",
+			inputString:       "",
+			tokenPosList:      []int{0},
+			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP}},
 		},
 		{
-			name:          "If we've consumed zero tokens, we should suggest an ID or Num",
-			inputString:   "123 + 4 + 10",
-			tokenPos:      0,
-			expectedTypes: []TokenType{METRIC_ID, NUM, AGGR_OP},
+			name:              "Binary Expression",
+			inputString:       "123 + 4 + 10",
+			tokenPosList:      []int{0, 1, 2, 3},
+			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP}, {ARITHMETIC}, {NUM}, {EOF, ARITHMETIC}},
 		},
 		{
-			name:          "If we detect a num we, should only suggest an arithmetic operator",
-			inputString:   "123 + 4 + 10",
-			tokenPos:      1,
-			expectedTypes: []TokenType{ARITHMETIC},
+			name:              "Metric Expression",
+			inputString:       "metric_name{label1='foo', label2='bar'}",
+			tokenPosList:      []int{1, 2, 3, 4, 5},
+			expectedTypesList: [][]TokenType{{EOF, LEFT_BRACE}, {METRIC_LABEL_SUBTYPE}, {OPERATOR}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}},
 		},
 		{
-			name:          "If we detect an arithmetic operator, we should suggest a num",
-			inputString:   "123 + 4 + 10",
-			tokenPos:      2,
-			expectedTypes: []TokenType{NUM},
+			name:              "Aggregation expression - the clause is after expression",
+			inputString:       "sum(metric_name)",
+			tokenPosList:      []int{1, 2, 3, 4},
+			expectedTypesList: [][]TokenType{{AGGR_KW, LEFT_PAREN}, {METRIC_ID}, {RIGHT_PAREN, LEFT_BRACE}, {AGGR_KW, EOF}},
+			//{OPERATOR}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE},{RIGHT_PAREN}, {AGGR_KW}},
 		},
 		{
-			name:           "Having consumed an ID, we should recommend a brace (paren in the future though) and EOF",
-			inputString:    "metric_name{label=",
-			tokenPos:       1,
-			expectedTypes:  []TokenType{EOF, LEFT_BRACE},
-			expectedMetric: proto.String("metric_name"),
-		},
-
-		{
-			name:           "Having consumed an left brace, we should recommend an ID",
-			inputString:    "metric_name{label=",
-			tokenPos:       2,
-			expectedTypes:  []TokenType{METRIC_LABEL_SUBTYPE},
-			expectedMetric: proto.String("metric_name"),
+			name:              "Aggregation expression - the clause is before expression",
+			inputString:       "sum by (label1, labels) (metricname)",
+			tokenPosList:      []int{1, 2, 3, 4, 5, 7, 8},
+			expectedTypesList: [][]TokenType{{AGGR_KW, LEFT_PAREN}, {LEFT_PAREN}, {METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN, COMMA}, {METRIC_LABEL_SUBTYPE}, {LEFT_PAREN}, {METRIC_ID}},
 		},
 		{
-			name:           "Having consumed a label, we should recommend an OPERATOR",
-			inputString:    "metric_name{label=",
-			tokenPos:       3,
-			expectedTypes:  []TokenType{OPERATOR},
-			expectedMetric: proto.String("metric_name"),
+			name:              "Aggregation expression - multiple label matchers",
+			inputString:       "sum(metricname{label1='foo', label2='bar'})",
+			tokenPosList:      []int{4, 5, 6, 7, 8, 12, 13},
+			expectedTypesList: [][]TokenType{{METRIC_LABEL_SUBTYPE}, {OPERATOR}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN}, {AGGR_KW, EOF}},
 		},
 		{
-			name:           "Having consumed an operator, we should recommend a string",
-			inputString:    "metric_name{label=",
-			tokenPos:       4,
-			expectedTypes:  []TokenType{STRING},
-			expectedMetric: proto.String("metric_name"),
-		},
-		{
-			name:           "Having consumed a labelvalue, we should recommend a closing brace",
-			inputString:    "metric_name{label='asdf'",
-			tokenPos:       5,
-			expectedTypes:  []TokenType{RIGHT_BRACE},
-			expectedMetric: proto.String("metric_name"),
-		},
-		{
-			name:          "If we detect an aggrgation op, we should suggest an opening paren",
-			inputString:   "sum(",
-			tokenPos:      1,
-			expectedTypes: []TokenType{AGGR_KW, LEFT_PAREN},
-		},
-		{
-			name:          "If we detect an aggregation op and opening paren, we should suggest an id",
-			inputString:   "sum(somemetricname",
-			tokenPos:      2,
-			expectedTypes: []TokenType{METRIC_ID},
-		},
-		{
-			name:           "If we detect an aggregation op and opening paren, we should close the func or label select",
-			inputString:    "sum(metric_name",
-			tokenPos:       3,
-			expectedTypes:  []TokenType{RIGHT_PAREN, LEFT_BRACE},
-			expectedMetric: proto.String("metric_name"),
-		},
-		{
-			name:           "should return metric label",
-			inputString:    "sum(metric_name_one{",
-			tokenPos:       4,
-			expectedTypes:  []TokenType{METRIC_LABEL_SUBTYPE},
-			expectedMetric: proto.String("metric_name_one"),
-		},
-		{
-			name:          "should return metric name",
-			inputString:   "sum(metric_name",
-			tokenPos:      2,
-			expectedTypes: []TokenType{METRIC_ID},
-		},
-		{
-			name:           "should return metric label subtype",
-			inputString:    "metric_name{",
-			tokenPos:       2,
-			expectedTypes:  []TokenType{METRIC_LABEL_SUBTYPE},
-			expectedMetric: proto.String("metric_name"),
-		},
-		{
-			name:           "should return metric label subtype",
-			inputString:    `sum(metric_name_one{`,
-			tokenPos:       4,
-			expectedTypes:  []TokenType{METRIC_LABEL_SUBTYPE},
-			expectedMetric: proto.String("metric_name_one"),
-		},
-		{
-			name:           "suggests aggr kw",
-			inputString:    `sum(metric_name_one)`,
-			tokenPos:       4,
-			expectedTypes:  []TokenType{AGGR_KW},
-			expectedMetric: proto.String("metric_name_one"),
+			name:              "Aggregation expression - label list",
+			inputString:       "sum(metricname{label1='foo', label2='bar'}) by (label1, label2)",
+			tokenPosList:      []int{14, 15, 16, 17},
+			expectedTypesList: [][]TokenType{{LEFT_PAREN}, {METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN, COMMA}, {METRIC_LABEL_SUBTYPE}},
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := NewEarleyParser(*promQLGrammar)
 			chart := p.Parse(tc.inputString)
-			validTypes := chart.GetValidTerminalTypesAtStateSet(tc.tokenPos)
-			var tknTypes []TokenType
-			var ctxes []completionContext
-			var metricName *string
-			for _, ct := range validTypes {
-				tknTypes = append(tknTypes, ct.TokenType)
-				if ct.ctx != nil {
-					if ct.ctx.metric != nil {
-						metricName = ct.ctx.metric
-					}
-					ctxes = append(ctxes, *ct.ctx)
+			for i, pos := range tc.tokenPosList {
+				validTypes := chart.GetValidTerminalTypesAtStateSet(pos)
+				var tknTypes []TokenType
+				//var ctxes []completionContext
+				//var metricName *string
+				for _, ct := range validTypes {
+					tknTypes = append(tknTypes, ct.TokenType)
+				}
+				if !reflect.DeepEqual(tknTypes, tc.expectedTypesList[i]) {
+					t.Errorf("Position %d: Got %v, expected %v\n", pos, tknTypes, tc.expectedTypesList[i])
 				}
 			}
-			if !reflect.DeepEqual(tc.expectedMetric, metricName) {
-				t.Errorf("Got %v, Expected metric in context :%v ",
-					safeRead(metricName),
-					safeRead(tc.expectedMetric))
-			}
-			if !reflect.DeepEqual(tknTypes, tc.expectedTypes) {
-				t.Errorf("\nGot %v, expected %v\n", validTypes, tc.expectedTypes)
-			}
+
 		})
 	}
 }
@@ -242,13 +191,13 @@ func TestPartialParse(t *testing.T) {
 			"previous input and new input are partially same",
 			"sum(metric_name_one{",
 			"sum(metric_name_one)",
-			[]TokenType{AGGR_KW},
+			[]TokenType{AGGR_KW, EOF},
 		},
 		{
 			"new input covers previous input",
 			"sum(metric_name_one",
 			"sum(metric_name_one)",
-			[]TokenType{AGGR_KW},
+			[]TokenType{AGGR_KW, EOF},
 		},
 		{
 			"previous input covers new input",

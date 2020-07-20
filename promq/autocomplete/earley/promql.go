@@ -20,14 +20,15 @@ type terminalType string
 
 var (
 	// non-terminals
-	Expression           = NewNonTerminal("expression", true)
-	MetricExpression     = NewNonTerminal("metric-expression", false)
-	AggrExpression       = NewNonTerminal("aggr-expression", false)
-	LabelsExpression     = NewNonTerminal("labels-expression", false)
-	LabelValueExpression = NewNonTerminal("label-value-expression", false)
-	AggrCallExpression   = NewNonTerminal("aggr-call-expression", false)
-	MetricLabelArgs      = NewNonTerminal("func-args", false)
-	BinaryExpression     = NewNonTerminal("binary-expression", false)
+	Expression            = NewNonTerminal("expression", true)
+	MetricExpression      = NewNonTerminal("metric-expression", false)
+	AggrExpression        = NewNonTerminal("aggr-expression", false)
+	LabelsExpression      = NewNonTerminal("labels-expression", false)
+	LabelsMatchExpression = NewNonTerminal("labels-match-expression", false)
+	LabelValueExpression  = NewNonTerminal("label-value-expression", false)
+	AggrCallExpression    = NewNonTerminal("aggr-call-expression", false)
+	MetricLabelArgs       = NewNonTerminal("func-args", false)
+	BinaryExpression      = NewNonTerminal("binary-expression", false)
 	//AggrFuncParam   = NewNonTerminal("func-param", false) // sometimes optional, but sometimes necessary
 
 	// terminals
@@ -61,12 +62,16 @@ var (
 		// 1) a metric expression can consist solely of a metric tokenType
 		NewRule(MetricExpression, MetricIdentifier),
 		// 2) a metric expression can optionally have a label expression
-		NewRule(MetricExpression, MetricIdentifier, LabelValueExpression),
+		NewRule(MetricExpression, MetricIdentifier, LabelsMatchExpression),
 
 		// AGGR EXPRESSIONS:
 		// 1) a aggregation operation expression can consist solely of a metric tokenType
+		// <aggr-op>([parameter,] <vector expression>)
+		NewRule(AggrExpression, AggregatorOp, AggrCallExpression),
+		// 2) <aggr-op>([parameter,] <vector expression>) [without|by (<label list>)]
 		// sum(metric) by (label1)
 		NewRule(AggrExpression, AggregatorOp, AggrCallExpression, AggregateKeyword, LabelsExpression),
+		// 3) <aggr-op> [without|by (<label list>)] ([parameter,] <vector expression>)
 		// sum by (label) (metric)
 		NewRule(AggrExpression, AggregatorOp, AggregateKeyword, LabelsExpression, AggrCallExpression),
 		// '(metric{label="blah"})'
@@ -79,7 +84,12 @@ var (
 		NewRule(MetricLabelArgs, MetricLabelArgs, Comma, MetricLabelIdentifier),
 		NewRule(MetricLabelArgs, MetricLabelIdentifier),
 
-		NewRule(LabelValueExpression, LBrace, MetricLabelIdentifier, Operator, Str, RBrace),
+		// {label1="blah",label2="else"}
+		NewRule(LabelsMatchExpression, LBrace, LabelValueExpression, RBrace),
+		NewRule(LabelValueExpression, MetricLabelIdentifier, Operator, Str),
+		NewRule(LabelValueExpression, LabelValueExpression, Comma, MetricLabelIdentifier, Operator, Str),
+
+		//NewRule(LabelValueExpression, LBrace, MetricLabelIdentifier, Operator, Str, RBrace),
 
 		// BINARY EXPRESSIONS:
 		NewRule(BinaryExpression, BinaryExpression, Arithmetic, Num),
@@ -112,5 +122,12 @@ var (
 		"group_left":  "",
 		"group_right": "",
 		"bool":        "",
+	}
+
+	arithmaticKeywords = map[string]string{
+		"+": "",
+		"-": "",
+		"*": "",
+		"/": "",
 	}
 )
