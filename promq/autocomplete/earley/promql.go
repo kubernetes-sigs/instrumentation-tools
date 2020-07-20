@@ -79,6 +79,8 @@ var (
 
 		// LABEL EXPRESSIONS:
 		NewRule(LabelsExpression, LParen, MetricLabelArgs, RParen),
+		// label list could be empty
+		NewRule(LabelsExpression, LParen, RParen),
 		// todo(han) it is also valid to have multiple targeted additional metric label
 		// todo(han) i.e. sum(metricname{label1="blah",label2="else"}) by (label3)
 		NewRule(MetricLabelArgs, MetricLabelArgs, Comma, MetricLabelIdentifier),

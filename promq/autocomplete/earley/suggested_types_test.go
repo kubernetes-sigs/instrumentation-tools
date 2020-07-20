@@ -114,13 +114,12 @@ func TestSuggestedTypes(t *testing.T) {
 			inputString:       "sum(metric_name)",
 			tokenPosList:      []int{1, 2, 3, 4},
 			expectedTypesList: [][]TokenType{{AGGR_KW, LEFT_PAREN}, {METRIC_ID}, {RIGHT_PAREN, LEFT_BRACE}, {AGGR_KW, EOF}},
-			//{OPERATOR}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE},{RIGHT_PAREN}, {AGGR_KW}},
 		},
 		{
 			name:              "Aggregation expression - the clause is before expression",
 			inputString:       "sum by (label1, labels) (metricname)",
 			tokenPosList:      []int{1, 2, 3, 4, 5, 7, 8},
-			expectedTypesList: [][]TokenType{{AGGR_KW, LEFT_PAREN}, {LEFT_PAREN}, {METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN, COMMA}, {METRIC_LABEL_SUBTYPE}, {LEFT_PAREN}, {METRIC_ID}},
+			expectedTypesList: [][]TokenType{{AGGR_KW, LEFT_PAREN}, {LEFT_PAREN}, {RIGHT_PAREN, METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN, COMMA}, {METRIC_LABEL_SUBTYPE}, {LEFT_PAREN}, {METRIC_ID}},
 		},
 		{
 			name:              "Aggregation expression - multiple label matchers",
@@ -129,10 +128,10 @@ func TestSuggestedTypes(t *testing.T) {
 			expectedTypesList: [][]TokenType{{METRIC_LABEL_SUBTYPE}, {OPERATOR}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN}, {AGGR_KW, EOF}},
 		},
 		{
-			name:              "Aggregation expression - label list",
+			name:              "Aggregation expression - has label list",
 			inputString:       "sum(metricname{label1='foo', label2='bar'}) by (label1, label2)",
 			tokenPosList:      []int{14, 15, 16, 17},
-			expectedTypesList: [][]TokenType{{LEFT_PAREN}, {METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN, COMMA}, {METRIC_LABEL_SUBTYPE}},
+			expectedTypesList: [][]TokenType{{LEFT_PAREN}, {RIGHT_PAREN, METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN, COMMA}, {METRIC_LABEL_SUBTYPE}},
 		},
 	}
 	for _, tc := range testCases {
@@ -142,8 +141,6 @@ func TestSuggestedTypes(t *testing.T) {
 			for i, pos := range tc.tokenPosList {
 				validTypes := chart.GetValidTerminalTypesAtStateSet(pos)
 				var tknTypes []TokenType
-				//var ctxes []completionContext
-				//var metricName *string
 				for _, ct := range validTypes {
 					tknTypes = append(tknTypes, ct.TokenType)
 				}
