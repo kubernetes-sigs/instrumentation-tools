@@ -17,13 +17,13 @@ limitations under the License.
 package earley
 
 import (
-	"k8s.io/instrumentation-tools/notstdlib/sets"
 	"reflect"
 	"testing"
 	"time"
 
-	"k8s.io/instrumentation-tools/pq/autocomplete"
-	"k8s.io/instrumentation-tools/pq/prom"
+	"sigs.k8s.io/instrumentation-tools/notstdlib/sets"
+	"sigs.k8s.io/instrumentation-tools/pq/autocomplete"
+	"sigs.k8s.io/instrumentation-tools/pq/prom"
 )
 
 func TestGetPrefix(t *testing.T) {

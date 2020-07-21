@@ -24,7 +24,6 @@ import (
 
 	"github.com/prometheus/prometheus/pkg/labels"
 	"github.com/prometheus/prometheus/storage"
-	"github.com/prometheus/prometheus/tsdb/chunkenc"
 	"github.com/prometheus/prometheus/tsdb/index"
 )
 
@@ -167,13 +166,12 @@ type memQuerier struct {
 	storage *rangeStorage
 }
 
-func (q *memQuerier) Select(sortSeries bool, _ *storage.SelectHints, matchers ...*labels.Matcher) (storage.SeriesSet, storage.Warnings, error) {
-	// we ignore hints b/c they're mostly just an optimization over large datasets
+func (q *memQuerier) SelectSorted(_ *storage.SelectParams, _ ...*labels.Matcher) (storage.SeriesSet, storage.Warnings, error) {
+	panic("fix me")
+}
 
-	// TODO: sort support
-	if sortSeries {
-		return nil, nil, fmt.Errorf("TODO: this requires sorting data, but that's not implemented yet")
-	}
+func (q *memQuerier) Select(_ *storage.SelectParams, matchers ...*labels.Matcher) (storage.SeriesSet, storage.Warnings, error) {
+	// we ignore hints b/c they're mostly just an optimization over large datasets
 
 	// TODO(sollyross): we can use tricks from tsdb/querier to optimize a bit
 	// if we need to for performance reasons
@@ -266,7 +264,7 @@ type blockSeries struct {
 	ind   int
 }
 
-func (s *blockSeries) Iterator() chunkenc.Iterator {
+func (s *blockSeries) Iterator() storage.SeriesIterator {
 	return s
 }
 func (s *blockSeries) Labels() labels.Labels {

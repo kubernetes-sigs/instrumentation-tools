@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/prometheus/prometheus/promql"
-	"github.com/prometheus/prometheus/promql/parser"
 )
 
 type DataSource interface {
@@ -62,7 +61,7 @@ func (q *PeriodicData) SetQuery(ctx context.Context, query string) error {
 	q.queryMu.Lock()
 	defer q.queryMu.Unlock()
 	// let's validate that the querystring is parseable
-	_, err := parser.ParseExpr(query)
+	_, err := promql.ParseExpr(query)
 	if err != nil {
 		return err
 	}

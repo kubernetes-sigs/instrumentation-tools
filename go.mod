@@ -21,6 +21,6 @@ require (
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.7.0
 	github.com/pkg/term v0.0.0-20200520122047-c3ffed290a03 // indirect
-	github.com/prometheus/prometheus v1.8.2-0.20200324204105-12d53dde558e
+	github.com/prometheus/prometheus v1.8.2-0.20200213233353-b90be6f32a33
 	gopkg.in/yaml.v2 v2.2.8
 )

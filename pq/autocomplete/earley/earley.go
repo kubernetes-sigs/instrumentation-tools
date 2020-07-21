@@ -16,7 +16,7 @@ limitations under the License.
 package earley
 
 import (
-	"k8s.io/instrumentation-tools/debug"
+	"sigs.k8s.io/instrumentation-tools/debug"
 )
 
 // Heavily adapted from https://github.com/jakub-m/gearley
