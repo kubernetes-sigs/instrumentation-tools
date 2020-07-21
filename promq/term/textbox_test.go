@@ -21,7 +21,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/gdamore/tcell"
 
-	"sigs.k8s.io/instrumentation-tools/pq/term"
+	"sigs.k8s.io/instrumentation-tools/promq/term"
 )
 
 func basicCells(text string, sty tcell.Style, fillerWidth int) []tcell.SimCell {

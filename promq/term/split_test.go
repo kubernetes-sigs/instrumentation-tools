@@ -20,7 +20,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"sigs.k8s.io/instrumentation-tools/pq/term"
+    "sigs.k8s.io/instrumentation-tools/promq/term"
 )
 
 var _ = Describe("StaticResizable", func() {

@@ -17,7 +17,7 @@ limitations under the License.
 package term
 
 import (
-	"sigs.k8s.io/instrumentation-tools/pq/term/plot"
+    "sigs.k8s.io/instrumentation-tools/promq/term/plot"
 	"github.com/gdamore/tcell"
 )
 
