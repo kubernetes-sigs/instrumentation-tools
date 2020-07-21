@@ -19,6 +19,7 @@ package earley
 
 import (
 	"fmt"
+	"github.com/prometheus/prometheus/promql/parser"
 	"strings"
 
 	"github.com/prometheus/prometheus/promql"
@@ -88,19 +89,30 @@ const (
 	ID                   TokenType = "identifier"
 	METRIC_ID            TokenType = "metric-identifier"
 	METRIC_LABEL_SUBTYPE TokenType = "metric-label-identifier"
-	ARITHMETIC           TokenType = "arithmetic"
-	OPERATOR             TokenType = "operator"
-	AGGR_OP              TokenType = "aggregator_operation"
-	AGGR_KW              TokenType = "aggregator_keyword"
-	LEFT_BRACE           TokenType = "leftbrace"
-	RIGHT_BRACE          TokenType = "rightbrace"
-	LEFT_PAREN           TokenType = "leftparen"
-	COMMA                TokenType = "comma"
-	RIGHT_PAREN          TokenType = "rightparen"
-	STRING               TokenType = "string"
-	NUM                  TokenType = "number"
-	EOF                  TokenType = "EOF"
-	UNKNOWN              TokenType = "unknown"
+
+	OPERATOR TokenType = "operator"
+	//binary operators
+	ARITHMETIC  TokenType = "arithmetic"
+	COMPARISION TokenType = "comparision"
+	LOGICAL     TokenType = "logical"
+	//label match operator
+	LABELMATCH TokenType = "label-match"
+
+	AGGR_OP TokenType = "aggregator_operation"
+
+	//keywords
+	AGGR_KW TokenType = "aggregator_keyword"
+	BOOL_KW TokenType = "bool_keyword"
+
+	LEFT_BRACE  TokenType = "leftbrace"
+	RIGHT_BRACE TokenType = "rightbrace"
+	LEFT_PAREN  TokenType = "leftparen"
+	COMMA       TokenType = "comma"
+	RIGHT_PAREN TokenType = "rightparen"
+	STRING      TokenType = "string"
+	NUM         TokenType = "number"
+	EOF         TokenType = "EOF"
+	UNKNOWN     TokenType = "unknown"
 )
 
 // Tokhan contains the essential bits of data we need
@@ -204,12 +216,16 @@ func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 		return LEFT_PAREN
 	case t == promql.RIGHT_PAREN:
 		return RIGHT_PAREN
-	case t == promql.ADD, t == promql.SUB, t == promql.MUL, t == promql.DIV:
+	case t == promql.BOOL:
+		return BOOL_KW
+	case t == promql.ADD, t == parser.SUB, t == parser.MUL, t == parser.DIV:
 		return ARITHMETIC
+	case t.IsSetOperator():
+		return LOGICAL
+	case t.IsOperator():
+		return OPERATOR
 	case t == promql.COMMA:
 		return COMMA
-	case t == promql.EQL:
-		return OPERATOR
 	case t == promql.NUMBER:
 		return NUM
 	default:

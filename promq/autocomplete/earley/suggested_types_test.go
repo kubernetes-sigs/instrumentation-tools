@@ -98,16 +98,16 @@ func TestSuggestedTypes(t *testing.T) {
 			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP}},
 		},
 		{
-			name:              "Binary Expression",
-			inputString:       "123 + 4 + 10",
-			tokenPosList:      []int{0, 1, 2, 3},
-			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP}, {ARITHMETIC}, {NUM}, {EOF, ARITHMETIC}},
+			name:              "Binary Expression - with scalar",
+			inputString:       "123 + 4 == bool 10",
+			tokenPosList:      []int{0, 1, 2, 3, 4, 5},
+			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP}, {ARITHMETIC, COMPARISION}, {NUM}, {EOF, ARITHMETIC, COMPARISION}, {BOOL_KW}, {NUM}},
 		},
 		{
 			name:              "Metric Expression",
 			inputString:       "metric_name{label1='foo', label2='bar'}",
 			tokenPosList:      []int{1, 2, 3, 4, 5},
-			expectedTypesList: [][]TokenType{{EOF, LEFT_BRACE}, {METRIC_LABEL_SUBTYPE}, {OPERATOR}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}},
+			expectedTypesList: [][]TokenType{{EOF, LEFT_BRACE}, {METRIC_LABEL_SUBTYPE}, {LABELMATCH}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}},
 		},
 		{
 			name:              "Aggregation expression - the clause is after expression",
@@ -125,7 +125,7 @@ func TestSuggestedTypes(t *testing.T) {
 			name:              "Aggregation expression - multiple label matchers",
 			inputString:       "sum(metricname{label1='foo', label2='bar'})",
 			tokenPosList:      []int{4, 5, 6, 7, 8, 12, 13},
-			expectedTypesList: [][]TokenType{{METRIC_LABEL_SUBTYPE}, {OPERATOR}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN}, {AGGR_KW, EOF}},
+			expectedTypesList: [][]TokenType{{METRIC_LABEL_SUBTYPE}, {LABELMATCH}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN}, {AGGR_KW, EOF}},
 		},
 		{
 			name:              "Aggregation expression - has label list",

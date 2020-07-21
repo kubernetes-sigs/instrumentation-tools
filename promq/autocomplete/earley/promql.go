@@ -36,9 +36,15 @@ var (
 	MetricIdentifier      = NewTerminalWithSubType(ID, METRIC_ID)            // this one is ambiguous
 	MetricLabelIdentifier = NewTerminalWithSubType(ID, METRIC_LABEL_SUBTYPE) // this one is ambiguous
 	AggregatorOp          = NewTerminal(AGGR_OP)
-	AggregateKeyword      = NewTerminal(AGGR_KW)
-	Arithmetic            = NewTerminal(ARITHMETIC) // we don't give a shit about precedence
-	Operator              = NewTerminal(OPERATOR)
+
+	AggregateKeyword = NewTerminal(AGGR_KW)
+	BoolKeyword      = NewTerminal(BOOL_KW)
+
+	Operator           = NewTerminal(OPERATOR)
+	Arithmetic         = NewTerminal(ARITHMETIC)
+	Logical            = NewTerminal(LOGICAL)
+	LabelMatchOperator = NewTerminalWithSubType(OPERATOR, LABELMATCH)
+	Comparision        = NewTerminalWithSubType(OPERATOR, COMPARISION)
 
 	LBrace = NewTerminal(LEFT_BRACE)
 	RBrace = NewTerminal(RIGHT_BRACE)
@@ -88,14 +94,18 @@ var (
 
 		// {label1="blah",label2="else"}
 		NewRule(LabelsMatchExpression, LBrace, LabelValueExpression, RBrace),
-		NewRule(LabelValueExpression, MetricLabelIdentifier, Operator, Str),
-		NewRule(LabelValueExpression, LabelValueExpression, Comma, MetricLabelIdentifier, Operator, Str),
+		NewRule(LabelValueExpression, MetricLabelIdentifier, LabelMatchOperator, Str),
+		NewRule(LabelValueExpression, LabelValueExpression, Comma, MetricLabelIdentifier, LabelMatchOperator, Str),
 
 		//NewRule(LabelValueExpression, LBrace, MetricLabelIdentifier, Operator, Str, RBrace),
 
 		// BINARY EXPRESSIONS:
+		// 1 + 1
 		NewRule(BinaryExpression, BinaryExpression, Arithmetic, Num),
+		NewRule(BinaryExpression, BinaryExpression, Comparision, BoolKeyword, Num),
+		// 1 == 1
 		NewRule(BinaryExpression, Num, Arithmetic, Num),
+		NewRule(BinaryExpression, Num, Comparision, BoolKeyword, Num),
 	)
 
 	PromQLParser = NewEarleyParser(*promQLGrammar)
@@ -126,10 +136,32 @@ var (
 		"bool":        "",
 	}
 
-	arithmaticKeywords = map[string]string{
+	arithmaticOperators = map[string]string{
 		"+": "",
 		"-": "",
 		"*": "",
 		"/": "",
+	}
+
+	comparisionOperators = map[string]string{
+		"==": "equal",
+		"!=": "not equal",
+		">":  "greater than",
+		"<":  "less than",
+		">=": "greater or equal",
+		"<=": "less or equal",
+	}
+
+	logicalOperators = map[string]string{
+		"and":    "intersection",
+		"or":     "union",
+		"unless": "complemetn",
+	}
+
+	labelMatchOperators = map[string]string{
+		"=":  "match equal",
+		"!=": "match not equal",
+		"=~": "match regexp",
+		"!~": "match not regexp",
 	}
 )
