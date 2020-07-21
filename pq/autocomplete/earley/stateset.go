@@ -3,7 +3,7 @@ package earley
 import (
 	"fmt"
 
-	"k8s.io/instrumentation-tools/debug"
+	"sigs.k8s.io/instrumentation-tools/debug"
 )
 
 type StateType string

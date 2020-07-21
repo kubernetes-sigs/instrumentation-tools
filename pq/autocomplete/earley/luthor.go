@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/instrumentation-tools/debug"
+	"github.com/prometheus/prometheus/promql"
 
-	"github.com/prometheus/prometheus/promql/parser"
+	"sigs.k8s.io/instrumentation-tools/debug"
 )
 
 type Tokens []Tokhan
@@ -109,13 +109,13 @@ type Tokhan struct {
 	StartPos int
 	EndPos   int
 	Type     TokenType
-	ItemType parser.ItemType
+	ItemType promql.ItemType
 	Val      string
 	_index   int
 }
 
 func (t Tokhan) isEof() bool {
-	return t.ItemType == parser.EOF
+	return t.ItemType == promql.EOF
 }
 
 func (t Tokhan) String() string {
@@ -141,12 +141,12 @@ func extractWords(query string) Tokens {
 // todo(cont):  not fond of the way this lexer encodes random syntactical
 // todo(cont):  rules during lexing
 func extractTokensWithOffset(query string, offset int) (words Tokens) {
-	l := parser.Lex(query)
+	l := promql.Lex(query)
 	i := 0
 	for {
-		currItem := parser.Item{}
+		currItem := promql.Item{}
 		l.NextItem(&currItem)
-		if currItem.Typ == parser.EOF {
+		if currItem.Typ == promql.EOF {
 			words = append(words, createTokenFromItem(currItem, offset))
 			break
 		}
@@ -155,7 +155,7 @@ func extractTokensWithOffset(query string, offset int) (words Tokens) {
 		// strings like `start(label='value)end` where we want as output:
 		// a linked list of tokens like this:
 		// "start" <-> "(" <-> "label" <-> "=" <-> "'value" <-> ")" <-> "end"
-		if currItem.Typ == parser.ERROR {
+		if currItem.Typ == promql.ERROR {
 			substring := query[currItem.Pos:]
 			// we're recursing and found an error already abort
 			if i == 0 {
@@ -173,7 +173,7 @@ func extractTokensWithOffset(query string, offset int) (words Tokens) {
 	return
 }
 
-func createTokenFromItem(item parser.Item, offset int) Tokhan {
+func createTokenFromItem(item promql.Item, offset int) Tokhan {
 	return Tokhan{
 		Val:      item.Val,
 		ItemType: item.Typ,
@@ -183,36 +183,42 @@ func createTokenFromItem(item parser.Item, offset int) Tokhan {
 	}
 }
 
-func mapParserItemTypeToTokhanType(item parser.Item) TokenType {
+func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 	t := item.Typ
 	switch {
 	case item.Val == "by", item.Val == "without":
 		return AGGR_KW
-	case t == parser.EOF:
+	case t == promql.EOF:
 		return EOF
-	case t == parser.STRING:
+	case t == promql.STRING:
 		return STRING
-	case t.IsAggregator():
+	case isAggregator(t):
 		return AGGR_OP
-	case t == parser.IDENTIFIER, t == parser.METRIC_IDENTIFIER:
+	case t == promql.IDENTIFIER, t == promql.METRIC_IDENTIFIER:
 		return ID
-	case t == parser.LEFT_BRACE:
+	case t == promql.LEFT_BRACE:
 		return LEFT_BRACE
-	case t == parser.RIGHT_BRACE:
+	case t == promql.RIGHT_BRACE:
 		return RIGHT_BRACE
-	case t == parser.LEFT_PAREN:
+	case t == promql.LEFT_PAREN:
 		return LEFT_PAREN
-	case t == parser.RIGHT_PAREN:
+	case t == promql.RIGHT_PAREN:
 		return RIGHT_PAREN
-	case t == parser.ADD, t == parser.SUB, t == parser.MUL, t == parser.DIV:
+	case t == promql.ADD, t == promql.SUB, t == promql.MUL, t == promql.DIV:
 		return ARITHMETIC
-	case t == parser.COMMA:
+	case t == promql.COMMA:
 		return COMMA
-	case t == parser.EQL:
+	case t == promql.EQL:
 		return OPERATOR
-	case t == parser.NUMBER:
+	case t == promql.NUMBER:
 		return NUM
 	default:
 		return UNKNOWN
 	}
+}
+
+// need to explicitly extract this function since it's private
+// in prometheus 2.16
+func isAggregator(item promql.ItemType) bool{
+	return item > 57386 && item < 57398
 }

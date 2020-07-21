@@ -20,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/instrumentation-tools/notstdlib/sets"
+	"sigs.k8s.io/instrumentation-tools/notstdlib/sets"
 )
 
 // a lot of this is lifted from "github.com/c-bata/go-prompt" but typed against sets.String

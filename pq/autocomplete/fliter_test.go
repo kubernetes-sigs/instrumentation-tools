@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/instrumentation-tools/notstdlib/sets"
+	"sigs.k8s.io/instrumentation-tools/notstdlib/sets"
 )
 
 func TestFilterPrefix(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/instrumentation-tools/debug"
+	"sigs.k8s.io/instrumentation-tools/debug"
 )
 
 // Earley parsers produce earley charts as an output, which

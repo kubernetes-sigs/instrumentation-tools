@@ -19,7 +19,7 @@ package error
 import (
 	"log"
 
-	"k8s.io/instrumentation-tools/debug"
+	"sigs.k8s.io/instrumentation-tools/debug"
 )
 
 var (

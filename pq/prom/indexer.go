@@ -21,8 +21,8 @@ import (
 
 	"github.com/prometheus/prometheus/pkg/labels"
 
-	debug "k8s.io/instrumentation-tools/debug/error"
-	"k8s.io/instrumentation-tools/notstdlib/sets"
+	debug "sigs.k8s.io/instrumentation-tools/debug/error"
+	"sigs.k8s.io/instrumentation-tools/notstdlib/sets"
 )
 
 type Indexer interface {

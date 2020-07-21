@@ -20,9 +20,9 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/instrumentation-tools/debug"
-	"k8s.io/instrumentation-tools/notstdlib/sets"
-	"k8s.io/instrumentation-tools/pq/autocomplete"
+	"sigs.k8s.io/instrumentation-tools/debug"
+	"sigs.k8s.io/instrumentation-tools/notstdlib/sets"
+	"sigs.k8s.io/instrumentation-tools/pq/autocomplete"
 )
 
 const (
