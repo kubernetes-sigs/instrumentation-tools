@@ -146,6 +146,10 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 				newMatch := NewPartialMatch(ao, "label-match", labelMatchOperators[ao])
 				matches = append(matches, newMatch)
 			}
+		case OFFSET_KW:
+			matches = append(matches, NewPartialMatch("offset", "keyword", keywords["offset"]))
+		case BOOL_KW:
+			matches = append(matches, NewPartialMatch("bool", "keyword", keywords["bool"]))
 		}
 		sort.Slice(matches, func(i, j int) bool {
 			return matches[i].GetValue() > matches[j].GetValue()

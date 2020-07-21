@@ -85,6 +85,10 @@ type TypedToken interface {
 
 type TokenType string
 
+func (t TokenType) IsKeyword() bool {
+	return t == AGGR_KW || t == BOOL_KW || t == OFFSET_KW
+}
+
 const (
 	ID                   TokenType = "identifier"
 	METRIC_ID            TokenType = "metric-identifier"
@@ -101,8 +105,10 @@ const (
 	AGGR_OP TokenType = "aggregator_operation"
 
 	//keywords
-	AGGR_KW TokenType = "aggregator_keyword"
-	BOOL_KW TokenType = "bool_keyword"
+	KEYWORD   TokenType = "keyword"
+	AGGR_KW   TokenType = "aggregator_keyword"
+	BOOL_KW   TokenType = "bool-keyword"
+	OFFSET_KW TokenType = "offset-keyword"
 
 	LEFT_BRACE  TokenType = "leftbrace"
 	RIGHT_BRACE TokenType = "rightbrace"
@@ -218,6 +224,10 @@ func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 		return RIGHT_PAREN
 	case t == promql.BOOL:
 		return BOOL_KW
+	case t == promql.OFFSET:
+		return OFFSET_KW
+	case t == promql.DURATION:
+		return DURATION
 	case t == promql.ADD, t == parser.SUB, t == parser.MUL, t == parser.DIV:
 		return ARITHMETIC
 	case t.IsSetOperator():

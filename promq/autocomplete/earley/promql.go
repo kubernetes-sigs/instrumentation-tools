@@ -29,6 +29,7 @@ var (
 	AggrCallExpression    = NewNonTerminal("aggr-call-expression", false)
 	MetricLabelArgs       = NewNonTerminal("func-args", false)
 	BinaryExpression      = NewNonTerminal("binary-expression", false)
+	OffsetExpression      = NewNonTerminal("offset-expression", false)
 	//AggrFuncParam   = NewNonTerminal("func-param", false) // sometimes optional, but sometimes necessary
 
 	// terminals
@@ -38,7 +39,8 @@ var (
 	AggregatorOp          = NewTerminal(AGGR_OP)
 
 	AggregateKeyword = NewTerminal(AGGR_KW)
-	BoolKeyword      = NewTerminal(BOOL_KW)
+	BoolKeyword      = NewTerminalWithSubType(KEYWORD, BOOL_KW)
+	OffsetKeyword    = NewTerminalWithSubType(KEYWORD, OFFSET_KW)
 
 	Operator           = NewTerminal(OPERATOR)
 	Arithmetic         = NewTerminal(ARITHMETIC)
@@ -46,14 +48,15 @@ var (
 	LabelMatchOperator = NewTerminalWithSubType(OPERATOR, LABELMATCH)
 	Comparision        = NewTerminalWithSubType(OPERATOR, COMPARISION)
 
-	LBrace = NewTerminal(LEFT_BRACE)
-	RBrace = NewTerminal(RIGHT_BRACE)
-	Comma  = NewTerminal(COMMA)
-	LParen = NewTerminal(LEFT_PAREN)
-	RParen = NewTerminal(RIGHT_PAREN)
-	Str    = NewTerminal(STRING)
-	Num    = NewTerminal(NUM)
-	Eof    = NewTerminal(EOF)
+	LBrace   = NewTerminal(LEFT_BRACE)
+	RBrace   = NewTerminal(RIGHT_BRACE)
+	Comma    = NewTerminal(COMMA)
+	LParen   = NewTerminal(LEFT_PAREN)
+	RParen   = NewTerminal(RIGHT_PAREN)
+	Str      = NewTerminal(STRING)
+	Num      = NewTerminal(NUM)
+	Duration = NewTerminal(DURATION)
+	Eof      = NewTerminal(EOF)
 
 	promQLGrammar = NewGrammar(
 
@@ -69,6 +72,12 @@ var (
 		NewRule(MetricExpression, MetricIdentifier),
 		// 2) a metric expression can optionally have a label expression
 		NewRule(MetricExpression, MetricIdentifier, LabelsMatchExpression),
+		// 3) a metric expression can optionally have offset to get historical data
+		NewRule(MetricExpression, MetricIdentifier, OffsetExpression),
+		NewRule(MetricExpression, MetricIdentifier, LabelsMatchExpression, OffsetExpression),
+
+		// UNARY EXPRESSIONS:
+		NewRule(OffsetExpression, OffsetKeyword, Duration),
 
 		// AGGR EXPRESSIONS:
 		// 1) a aggregation operation expression can consist solely of a metric tokenType
@@ -124,16 +133,15 @@ var (
 		"quantile":     "calculate φ-quantile (0 ≤ φ ≤ 1) over dimensions",
 	}
 
-	// Todo:(yuchen) add the description for aggr_kw
+	// Todo:(yuchen) add the description for keywords
 	aggregateKeywords = map[string]string{
-		"offset":      "",
-		"by":          "",
-		"without":     "",
-		"on":          "",
-		"ignoring":    "",
-		"group_left":  "",
-		"group_right": "",
-		"bool":        "",
+		"by":      "",
+		"without": "",
+	}
+
+	keywords = map[string]string{
+		"bool":   "",
+		"offset": "",
 	}
 
 	arithmaticOperators = map[string]string{

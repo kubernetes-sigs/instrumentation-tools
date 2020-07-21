@@ -104,16 +104,22 @@ func TestSuggestedTypes(t *testing.T) {
 			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP}, {ARITHMETIC, COMPARISION}, {NUM}, {EOF, ARITHMETIC, COMPARISION}, {BOOL_KW}, {NUM}},
 		},
 		{
-			name:              "Metric Expression",
+			name:              "Metric Expression - with labels",
 			inputString:       "metric_name{label1='foo', label2='bar'}",
-			tokenPosList:      []int{1, 2, 3, 4, 5},
-			expectedTypesList: [][]TokenType{{EOF, LEFT_BRACE}, {METRIC_LABEL_SUBTYPE}, {LABELMATCH}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}},
+			tokenPosList:      []int{1, 2, 3, 4, 5, 6, 10},
+			expectedTypesList: [][]TokenType{{EOF, LEFT_BRACE, OFFSET_KW}, {METRIC_LABEL_SUBTYPE}, {LABELMATCH}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}, {EOF, OFFSET_KW}},
+		},
+		{
+			name:              "Metric Expression - with offset",
+			inputString:       "metric_name offset 5m",
+			tokenPosList:      []int{1, 2, 3},
+			expectedTypesList: [][]TokenType{{EOF, LEFT_BRACE, OFFSET_KW}, {DURATION}, {EOF}},
 		},
 		{
 			name:              "Aggregation expression - the clause is after expression",
 			inputString:       "sum(metric_name)",
 			tokenPosList:      []int{1, 2, 3, 4},
-			expectedTypesList: [][]TokenType{{AGGR_KW, LEFT_PAREN}, {METRIC_ID}, {RIGHT_PAREN, LEFT_BRACE}, {AGGR_KW, EOF}},
+			expectedTypesList: [][]TokenType{{AGGR_KW, LEFT_PAREN}, {METRIC_ID}, {RIGHT_PAREN, LEFT_BRACE, OFFSET_KW}, {AGGR_KW, EOF}},
 		},
 		{
 			name:              "Aggregation expression - the clause is before expression",
@@ -125,7 +131,7 @@ func TestSuggestedTypes(t *testing.T) {
 			name:              "Aggregation expression - multiple label matchers",
 			inputString:       "sum(metricname{label1='foo', label2='bar'})",
 			tokenPosList:      []int{4, 5, 6, 7, 8, 12, 13},
-			expectedTypesList: [][]TokenType{{METRIC_LABEL_SUBTYPE}, {LABELMATCH}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN}, {AGGR_KW, EOF}},
+			expectedTypesList: [][]TokenType{{METRIC_LABEL_SUBTYPE}, {LABELMATCH}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN, OFFSET_KW}, {AGGR_KW, EOF}},
 		},
 		{
 			name:              "Aggregation expression - has label list",
@@ -164,7 +170,7 @@ func TestPartialParse(t *testing.T) {
 			"new input is same as previous input",
 			"sum(metric_name_one",
 			"sum(metric_name_one",
-			[]TokenType{RIGHT_PAREN, LEFT_BRACE},
+			[]TokenType{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW},
 		},
 		{
 			"new input is empty",
@@ -176,13 +182,13 @@ func TestPartialParse(t *testing.T) {
 			"previous input is empty",
 			"",
 			"sum(metric_name_one",
-			[]TokenType{RIGHT_PAREN, LEFT_BRACE},
+			[]TokenType{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW},
 		},
 		{
 			"previous input and new input are different from beginning",
 			"metric_name{label=",
 			"sum(metric_name_one",
-			[]TokenType{RIGHT_PAREN, LEFT_BRACE},
+			[]TokenType{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW},
 		},
 		{
 			"previous input and new input are partially same",
@@ -200,7 +206,7 @@ func TestPartialParse(t *testing.T) {
 			"previous input covers new input",
 			"sum(metric_name_one{",
 			"sum(metric_name_one",
-			[]TokenType{RIGHT_PAREN, LEFT_BRACE},
+			[]TokenType{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW},
 		},
 	}
 
