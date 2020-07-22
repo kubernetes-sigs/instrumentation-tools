@@ -22,7 +22,7 @@ import (
 
 	"sigs.k8s.io/instrumentation-tools/debug"
 	"sigs.k8s.io/instrumentation-tools/notstdlib/sets"
-	"sigs.k8s.io/instrumentation-tools/pq/autocomplete"
+	"sigs.k8s.io/instrumentation-tools/promq/autocomplete"
 )
 
 const (

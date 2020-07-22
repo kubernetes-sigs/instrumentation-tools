@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"sigs.k8s.io/instrumentation-tools/notstdlib/sets"
-	"sigs.k8s.io/instrumentation-tools/pq/autocomplete"
-	"sigs.k8s.io/instrumentation-tools/pq/prom"
+	"sigs.k8s.io/instrumentation-tools/promq/autocomplete"
+	"sigs.k8s.io/instrumentation-tools/promq/prom"
 )
 
 func TestGetPrefix(t *testing.T) {
