@@ -28,6 +28,9 @@ type GraphView struct {
 
 	DomainLabeler plot.DomainLabeler
 	RangeLabeler plot.RangeLabeler
+
+	DomainTickSpacing int
+	RangeTickSpacing int
 }
 
 func (g *GraphView) SetBox(box PositionBox) {
@@ -39,12 +42,22 @@ func (g *GraphView) FlushTo(screen tcell.Screen) {
 		return
 	}
 
+	// default to ticks 10 apart
+	rangeSpacing := g.RangeTickSpacing
+	if rangeSpacing == 0 {
+		rangeSpacing = 10
+	}
+	domainSpacing := g.DomainTickSpacing
+	if domainSpacing == 0 {
+		domainSpacing = 10
+	}
+
 	screenSize := plot.ScreenSize{Cols: plot.Column(g.pos.Cols), Rows: plot.Row(g.pos.Rows)}
 	scale := func(p float64) float64 { return p }
 	axes := plot.EvenlySpacedTicks(g.Graph, screenSize, plot.TickScaling{
 		RangeScale: scale,
-		DomainDensity: 10, 
-		RangeDensity: 10,
+		DomainDensity: domainSpacing, 
+		RangeDensity: rangeSpacing,
 	}, plot.Labeling{
 		DomainLabeler: g.DomainLabeler,
 		RangeLabeler: g.RangeLabeler,
@@ -57,7 +70,6 @@ func (g *GraphView) FlushTo(screen tcell.Screen) {
 	}
 
 	plot.DrawAxes(axes, func(row plot.Row, col plot.Column, contents rune, kind plot.AxisCellKind) {
-		// TODO: special @ 0, 0
 		switch kind {
 		case plot.DomainTickKind:
 			var sty tcell.Style

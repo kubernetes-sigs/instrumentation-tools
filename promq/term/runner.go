@@ -33,12 +33,25 @@ type Runner struct {
 	screenMu sync.Mutex
 
 	KeyHandler func(*tcell.EventKey)
+	
+	// MakeScreen allows custom screens to be used.  Mainly useful for testing.
+	MakeScreen func() (tcell.Screen, error)
 }
 
 func (r *Runner) Run(ctx context.Context, initialView View) error {
-	screen, err := tcell.NewScreen()
-	if err != nil {
-		return err
+	var screen tcell.Screen
+	if r.MakeScreen == nil {
+		var err error
+		screen, err = tcell.NewScreen()
+		if err != nil {
+			return err
+		}
+	} else {
+		var err error
+		screen, err = r.MakeScreen()
+		if err != nil {
+			return err
+		}
 	}
 	screen.Init()
 	defer screen.Fini()
@@ -47,10 +60,16 @@ func (r *Runner) Run(ctx context.Context, initialView View) error {
 	r.screen = screen
 	r.screenMu.Unlock()
 
-	screenCols, screenRows := screen.Size()
 	mainView := initialView
+
+	// paint one initial time in case we don't get the immediate resize event
+	if mainView != nil {
+		mainView.FlushTo(screen)
+		screen.Show()
+	}
 	go func() {
 		for evt := screen.PollEvent(); evt != nil; evt = screen.PollEvent() {
+			screenCols, screenRows := screen.Size()
 			switch evt := evt.(type) {
 			case *tcell.EventKey:
 				r.KeyHandler(evt)
