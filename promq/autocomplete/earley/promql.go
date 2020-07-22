@@ -20,16 +20,21 @@ type terminalType string
 
 var (
 	// non-terminals
-	Expression            = NewNonTerminal("expression", true)
-	MetricExpression      = NewNonTerminal("metric-expression", false)
-	AggrExpression        = NewNonTerminal("aggr-expression", false)
+	Expression       = NewNonTerminal("expression", true)
+	MetricExpression = NewNonTerminal("metric-expression", false)
+	AggrExpression   = NewNonTerminal("aggr-expression", false)
+	BinaryExpression = NewNonTerminal("binary-expression", false)
+
+	MatrixSelector = NewNonTerminal("matrix-selector", false)
+	VectorSelector = NewNonTerminal("vector-selector", false)
+
 	LabelsExpression      = NewNonTerminal("labels-expression", false)
 	LabelsMatchExpression = NewNonTerminal("labels-match-expression", false)
 	LabelValueExpression  = NewNonTerminal("label-value-expression", false)
 	AggrCallExpression    = NewNonTerminal("aggr-call-expression", false)
 	MetricLabelArgs       = NewNonTerminal("func-args", false)
-	BinaryExpression      = NewNonTerminal("binary-expression", false)
-	OffsetExpression      = NewNonTerminal("offset-expression", false)
+
+	OffsetExpression = NewNonTerminal("offset-expression", false)
 	//AggrFuncParam   = NewNonTerminal("func-param", false) // sometimes optional, but sometimes necessary
 
 	// terminals
@@ -50,6 +55,8 @@ var (
 
 	LBrace   = NewTerminal(LEFT_BRACE)
 	RBrace   = NewTerminal(RIGHT_BRACE)
+	LBracket = NewTerminal(LEFT_BRACKET)
+	RBracket = NewTerminal(RIGHT_BRACKET)
 	Comma    = NewTerminal(COMMA)
 	LParen   = NewTerminal(LEFT_PAREN)
 	RParen   = NewTerminal(RIGHT_PAREN)
@@ -62,19 +69,33 @@ var (
 
 		// TOP LEVEL RULES:
 
-		// 1) an expression can be a metric/binary/aggr expression
+		// 1) an expression can be a metric/binary/aggr/range expression
 		NewRule(Expression, MetricExpression, Eof),
 		NewRule(Expression, BinaryExpression, Eof),
 		NewRule(Expression, AggrExpression, Eof),
 
 		// METRIC EXPRESSIONS:
-		// 1) a metric expression can consist solely of a metric tokenType
-		NewRule(MetricExpression, MetricIdentifier),
-		// 2) a metric expression can optionally have a label expression
-		NewRule(MetricExpression, MetricIdentifier, LabelsMatchExpression),
+		// 1) Instant vector selectors
+		NewRule(MetricExpression, VectorSelector),
+		// 2) Range Vector Selectors
+		NewRule(MetricExpression, MatrixSelector),
+
+		// VECTOR SELECTOR
+		// 1) a vector selector can consist solely of a metric tokenType
+		NewRule(VectorSelector, MetricIdentifier),
+		// 2) a vector selector can optionally have a label expression
+		NewRule(VectorSelector, MetricIdentifier, LabelsMatchExpression),
 		// 3) a metric expression can optionally have offset to get historical data
-		NewRule(MetricExpression, MetricIdentifier, OffsetExpression),
-		NewRule(MetricExpression, MetricIdentifier, LabelsMatchExpression, OffsetExpression),
+		NewRule(VectorSelector, MetricIdentifier, OffsetExpression),
+		NewRule(VectorSelector, MetricIdentifier, LabelsMatchExpression, OffsetExpression),
+
+		// MATRIX SELECTOR
+		// metric[5m]
+		NewRule(MatrixSelector, MetricIdentifier, LBracket, Duration, RBracket),
+		NewRule(MatrixSelector, MetricIdentifier, LabelsMatchExpression, LBracket, Duration, RBracket),
+		// metric[5m] offset 3h
+		NewRule(MatrixSelector, MetricIdentifier, LBracket, Duration, RBracket, OffsetExpression),
+		NewRule(MatrixSelector, MetricIdentifier, LabelsMatchExpression, LBracket, Duration, RBracket, OffsetExpression),
 
 		// UNARY EXPRESSIONS:
 		NewRule(OffsetExpression, OffsetKeyword, Duration),
@@ -90,7 +111,7 @@ var (
 		// sum by (label) (metric)
 		NewRule(AggrExpression, AggregatorOp, AggregateKeyword, LabelsExpression, AggrCallExpression),
 		// '(metric{label="blah"})'
-		NewRule(AggrCallExpression, LParen, MetricExpression, RParen),
+		NewRule(AggrCallExpression, LParen, VectorSelector, RParen),
 
 		// LABEL EXPRESSIONS:
 		NewRule(LabelsExpression, LParen, MetricLabelArgs, RParen),
@@ -163,7 +184,7 @@ var (
 	logicalOperators = map[string]string{
 		"and":    "intersection",
 		"or":     "union",
-		"unless": "complemetn",
+		"unless": "complement",
 	}
 
 	labelMatchOperators = map[string]string{
@@ -171,5 +192,14 @@ var (
 		"!=": "match not equal",
 		"=~": "match regexp",
 		"!~": "match not regexp",
+	}
+
+	timeUnits = map[string]string{
+		"s": "seconds",
+		"m": "minuets",
+		"h": "hours",
+		"d": "days",
+		"w": "weeks",
+		"y": "years",
 	}
 )

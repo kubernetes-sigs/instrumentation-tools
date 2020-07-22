@@ -18,6 +18,7 @@ package earley
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -107,13 +108,19 @@ func TestSuggestedTypes(t *testing.T) {
 			name:              "Metric Expression - with labels",
 			inputString:       "metric_name{label1='foo', label2='bar'}",
 			tokenPosList:      []int{1, 2, 3, 4, 5, 6, 10},
-			expectedTypesList: [][]TokenType{{EOF, LEFT_BRACE, OFFSET_KW}, {METRIC_LABEL_SUBTYPE}, {LABELMATCH}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}, {EOF, OFFSET_KW}},
+			expectedTypesList: [][]TokenType{{EOF, LEFT_BRACE, OFFSET_KW, LEFT_BRACKET}, {METRIC_LABEL_SUBTYPE}, {LABELMATCH}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}, {EOF, OFFSET_KW, LEFT_BRACKET}},
 		},
 		{
 			name:              "Metric Expression - with offset",
 			inputString:       "metric_name offset 5m",
-			tokenPosList:      []int{1, 2, 3},
-			expectedTypesList: [][]TokenType{{EOF, LEFT_BRACE, OFFSET_KW}, {DURATION}, {EOF}},
+			tokenPosList:      []int{2, 3},
+			expectedTypesList: [][]TokenType{{DURATION}, {EOF}},
+		},
+		{
+			name:              "Metric Expression - range vector selector",
+			inputString:       "metric_name[3m] offset 5m",
+			tokenPosList:      []int{2, 3, 4},
+			expectedTypesList: [][]TokenType{{DURATION}, {RIGHT_BRACKET}, {EOF, OFFSET_KW}},
 		},
 		{
 			name:              "Aggregation expression - the clause is after expression",
@@ -150,11 +157,11 @@ func TestSuggestedTypes(t *testing.T) {
 				for _, ct := range validTypes {
 					tknTypes = append(tknTypes, ct.TokenType)
 				}
-				if !reflect.DeepEqual(tknTypes, tc.expectedTypesList[i]) {
+
+				if !isEqualTypes(tknTypes, tc.expectedTypesList[i]) {
 					t.Errorf("Position %d: Got %v, expected %v\n", pos, tknTypes, tc.expectedTypesList[i])
 				}
 			}
-
 		})
 	}
 }
@@ -221,7 +228,7 @@ func TestPartialParse(t *testing.T) {
 			for _, ct := range validTypes {
 				tknTypes = append(tknTypes, ct.TokenType)
 			}
-			if !reflect.DeepEqual(tknTypes, tc.expectedTypes) {
+			if !isEqualTypes(tknTypes, tc.expectedTypes) {
 				t.Errorf("\nGot %v, expected %v\n", validTypes, tc.expectedTypes)
 			}
 		})
@@ -233,4 +240,17 @@ func safeRead(sp *string) string {
 		return ""
 	}
 	return *sp
+}
+
+func isEqualTypes(actual []TokenType, expected []TokenType) bool {
+	sort.Slice(actual, func(i, j int) bool {
+		return actual[i] > actual[j]
+	})
+	sort.Slice(expected, func(k, j int) bool {
+		return expected[k] > expected[j]
+	})
+	if !reflect.DeepEqual(actual, expected) {
+		return false
+	}
+	return true
 }

@@ -19,7 +19,6 @@ package earley
 
 import (
 	"fmt"
-	"github.com/prometheus/prometheus/promql/parser"
 	"strings"
 
 	"github.com/prometheus/prometheus/promql"
@@ -110,15 +109,18 @@ const (
 	BOOL_KW   TokenType = "bool-keyword"
 	OFFSET_KW TokenType = "offset-keyword"
 
-	LEFT_BRACE  TokenType = "leftbrace"
-	RIGHT_BRACE TokenType = "rightbrace"
-	LEFT_PAREN  TokenType = "leftparen"
-	COMMA       TokenType = "comma"
-	RIGHT_PAREN TokenType = "rightparen"
-	STRING      TokenType = "string"
-	NUM         TokenType = "number"
-	EOF         TokenType = "EOF"
-	UNKNOWN     TokenType = "unknown"
+	LEFT_BRACE    TokenType = "leftbrace"
+	RIGHT_BRACE   TokenType = "rightbrace"
+	LEFT_PAREN    TokenType = "leftparen"
+	RIGHT_PAREN   TokenType = "rightparen"
+	LEFT_BRACKET  TokenType = "leftbracket"
+	RIGHT_BRACKET TokenType = "rightbracket"
+	COMMA         TokenType = "comma"
+	STRING        TokenType = "string"
+	NUM           TokenType = "number"
+	DURATION      TokenType = "duration"
+	EOF           TokenType = "EOF"
+	UNKNOWN       TokenType = "unknown"
 )
 
 // Tokhan contains the essential bits of data we need
@@ -224,15 +226,19 @@ func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 		return RIGHT_PAREN
 	case t == promql.BOOL:
 		return BOOL_KW
+	case t == promql.LEFT_BRACKET:
+		return LEFT_BRACKET
+	case t == promql.RIGHT_BRACKET:
+		return RIGHT_BRACKET
 	case t == promql.OFFSET:
 		return OFFSET_KW
 	case t == promql.DURATION:
 		return DURATION
-	case t == promql.ADD, t == parser.SUB, t == parser.MUL, t == parser.DIV:
+	case t == promql.ADD, t == promql.SUB, t == promql.MUL, t == promql.DIV:
 		return ARITHMETIC
-	case t.IsSetOperator():
+	case t == promql.LAND, t == promql.LOR, t == promql.LUNLESS:
 		return LOGICAL
-	case t.IsOperator():
+	case isOperator(t):
 		return OPERATOR
 	case t == promql.COMMA:
 		return COMMA
@@ -245,6 +251,10 @@ func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 
 // need to explicitly extract this function since it's private
 // in prometheus 2.16
-func isAggregator(item promql.ItemType) bool{
+func isAggregator(item promql.ItemType) bool {
 	return item > 57386 && item < 57398
+}
+
+func isOperator(item promql.ItemType) bool {
+	return item > 57367 && item < 57385
 }

@@ -18,6 +18,7 @@ package earley
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"sigs.k8s.io/instrumentation-tools/debug"
@@ -150,6 +151,14 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 			matches = append(matches, NewPartialMatch("offset", "keyword", keywords["offset"]))
 		case BOOL_KW:
 			matches = append(matches, NewPartialMatch("bool", "keyword", keywords["bool"]))
+		case DURATION:
+			// add time units to match is the prefix is number
+			if _, err := strconv.Atoi(autocompletePrefix); err == nil {
+				for _, ao := range sets.StringKeySet(timeUnits).List() {
+					newMatch := NewPartialMatch(ao, "time-unit", timeUnits[ao])
+					matches = append(matches, newMatch)
+				}
+			}
 		}
 		sort.Slice(matches, func(i, j int) bool {
 			return matches[i].GetValue() > matches[j].GetValue()
@@ -165,6 +174,8 @@ func getPrefix(query string) string {
 	for i := len(query) - 1; i >= 0; i-- {
 		c := []rune(query)[i]
 		if strings.ContainsRune(PromQLTokenSeparators, c) {
+			// Todo(yuchen): what if the input is sum(metric_a and metric_a is the completed metric name?
+			// Should we return metric_a as a prefix or return the next suggested token of metric name?
 			return query[i+1:]
 		}
 	}
