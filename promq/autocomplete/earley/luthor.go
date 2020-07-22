@@ -92,6 +92,7 @@ const (
 	ID                   TokenType = "identifier"
 	METRIC_ID            TokenType = "metric-identifier"
 	METRIC_LABEL_SUBTYPE TokenType = "metric-label-identifier"
+	FUNCTION_ID          TokenType = "function-identifier"
 
 	OPERATOR TokenType = "operator"
 	//binary operators
@@ -214,7 +215,9 @@ func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 		return STRING
 	case isAggregator(t):
 		return AGGR_OP
-	case t == promql.IDENTIFIER, t == promql.METRIC_IDENTIFIER:
+	case t == promql.METRIC_IDENTIFIER:
+		return METRIC_ID
+	case t == promql.IDENTIFIER:
 		return ID
 	case t == promql.LEFT_BRACE:
 		return LEFT_BRACE

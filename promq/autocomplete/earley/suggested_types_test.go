@@ -90,23 +90,29 @@ func TestSuggestedTypes(t *testing.T) {
 			name:              "If we've consumed zero tokens, then we should suggest",
 			inputString:       "blah",
 			tokenPosList:      []int{0},
-			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP}},
+			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP, FUNCTION_ID}},
 		},
 		{
 			name:              "If we have an empty string, then we should suggest",
 			inputString:       "",
 			tokenPosList:      []int{0},
-			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP}},
+			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP, FUNCTION_ID}},
 		},
 		{
 			name:              "Binary Expression - with scalar",
 			inputString:       "123 + 4 == bool 10",
 			tokenPosList:      []int{0, 1, 2, 3, 4, 5},
-			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP}, {ARITHMETIC, COMPARISION}, {NUM}, {EOF, ARITHMETIC, COMPARISION}, {BOOL_KW}, {NUM}},
+			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP, FUNCTION_ID}, {ARITHMETIC, COMPARISION}, {NUM}, {EOF, ARITHMETIC, COMPARISION}, {BOOL_KW}, {NUM}},
 		},
 		{
 			name:              "Metric Expression - with labels",
 			inputString:       "metric_name{label1='foo', label2='bar'}",
+			tokenPosList:      []int{1, 2, 3, 4, 5, 6, 10},
+			expectedTypesList: [][]TokenType{{EOF, LEFT_BRACE, OFFSET_KW, LEFT_BRACKET, LEFT_PAREN}, {METRIC_LABEL_SUBTYPE}, {LABELMATCH}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}, {EOF, OFFSET_KW, LEFT_BRACKET}},
+		},
+		{
+			name:              "Metric Expression - metric name contains `:`",
+			inputString:       "metric:name{label1='foo', label2='bar'}",
 			tokenPosList:      []int{1, 2, 3, 4, 5, 6, 10},
 			expectedTypesList: [][]TokenType{{EOF, LEFT_BRACE, OFFSET_KW, LEFT_BRACKET}, {METRIC_LABEL_SUBTYPE}, {LABELMATCH}, {STRING}, {RIGHT_BRACE, COMMA}, {METRIC_LABEL_SUBTYPE}, {EOF, OFFSET_KW, LEFT_BRACKET}},
 		},
@@ -146,6 +152,36 @@ func TestSuggestedTypes(t *testing.T) {
 			tokenPosList:      []int{14, 15, 16, 17},
 			expectedTypesList: [][]TokenType{{LEFT_PAREN}, {RIGHT_PAREN, METRIC_LABEL_SUBTYPE}, {RIGHT_PAREN, COMMA}, {METRIC_LABEL_SUBTYPE}},
 		},
+		{
+			name:              "Function expression - no args",
+			inputString:       "time()",
+			tokenPosList:      []int{2, 3},
+			expectedTypesList: [][]TokenType{{RIGHT_PAREN, NUM, METRIC_ID, FUNCTION_ID, AGGR_OP}, {EOF}},
+		},
+		{
+			name:              "Function expression - have expression as arg",
+			inputString:       "floor(metricname{foo!='bar'})",
+			tokenPosList:      []int{8, 9},
+			expectedTypesList: [][]TokenType{{RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET}, {EOF}},
+		},
+		{
+			name:              "Function expression - have aggregation expression as arg",
+			inputString:       "vector(sum(metricname{foo!='bar'}))",
+			tokenPosList:      []int{10, 11},
+			expectedTypesList: [][]TokenType{{RIGHT_PAREN, OFFSET_KW}, {RIGHT_PAREN, COMMA, AGGR_KW}},
+		},
+		{
+			name:              "Function expression - have multiple args",
+			inputString:       "round(metricname, 5)",
+			tokenPosList:      []int{3, 4, 5},
+			expectedTypesList: [][]TokenType{{RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, LEFT_PAREN, LEFT_BRACE}, {METRIC_ID, NUM, AGGR_OP, FUNCTION_ID}, {RIGHT_PAREN, COMMA}},
+		},
+		{
+			name:              "Function expression - nested function call",
+			inputString:       "ceil(abs(metricname{foo!='bar'}))",
+			tokenPosList:      []int{3, 4, 10, 11},
+			expectedTypesList: [][]TokenType{{RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, LEFT_PAREN, LEFT_BRACE}, {RIGHT_PAREN, METRIC_ID, NUM, AGGR_OP, FUNCTION_ID}, {RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET}, {RIGHT_PAREN, COMMA}},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -183,7 +219,7 @@ func TestPartialParse(t *testing.T) {
 			"new input is empty",
 			"sum(metric_name_one",
 			"",
-			[]TokenType{METRIC_ID, NUM, AGGR_OP},
+			[]TokenType{METRIC_ID, NUM, AGGR_OP, FUNCTION_ID},
 		},
 		{
 			"previous input is empty",

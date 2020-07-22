@@ -24,6 +24,7 @@ var (
 	MetricExpression = NewNonTerminal("metric-expression", false)
 	AggrExpression   = NewNonTerminal("aggr-expression", false)
 	BinaryExpression = NewNonTerminal("binary-expression", false)
+	FuncExpression   = NewNonTerminal("function-expression", false)
 
 	MatrixSelector = NewNonTerminal("matrix-selector", false)
 	VectorSelector = NewNonTerminal("vector-selector", false)
@@ -37,10 +38,15 @@ var (
 	OffsetExpression = NewNonTerminal("offset-expression", false)
 	//AggrFuncParam   = NewNonTerminal("func-param", false) // sometimes optional, but sometimes necessary
 
+	FunctionCallBody = NewNonTerminal("function-call-body", false)
+	FunctionCallArgs = NewNonTerminal("function-call-args", false)
+	FunctionArgsType = NewNonTerminal("function-args-type", false)
+
 	// terminals
 	Identifier            = NewTerminal(ID)                                  // this one is ambiguous
 	MetricIdentifier      = NewTerminalWithSubType(ID, METRIC_ID)            // this one is ambiguous
 	MetricLabelIdentifier = NewTerminalWithSubType(ID, METRIC_LABEL_SUBTYPE) // this one is ambiguous
+	FunctionIdentifier    = NewTerminalWithSubType(ID, FUNCTION_ID)
 	AggregatorOp          = NewTerminal(AGGR_OP)
 
 	AggregateKeyword = NewTerminal(AGGR_KW)
@@ -68,11 +74,11 @@ var (
 	promQLGrammar = NewGrammar(
 
 		// TOP LEVEL RULES:
-
-		// 1) an expression can be a metric/binary/aggr/range expression
+		// 1) an expression can be a metric/binary/aggr/function expression
 		NewRule(Expression, MetricExpression, Eof),
 		NewRule(Expression, BinaryExpression, Eof),
 		NewRule(Expression, AggrExpression, Eof),
+		NewRule(Expression, FuncExpression, Eof),
 
 		// METRIC EXPRESSIONS:
 		// 1) Instant vector selectors
@@ -136,6 +142,20 @@ var (
 		// 1 == 1
 		NewRule(BinaryExpression, Num, Arithmetic, Num),
 		NewRule(BinaryExpression, Num, Comparision, BoolKeyword, Num),
+
+		//FUNCTION EXPRESSIONS:
+		//Todo(yuchen) The input args can vary from different functions. Here I only define the general rule.
+		NewRule(FuncExpression, FunctionIdentifier, FunctionCallBody),
+		// time()
+		NewRule(FunctionCallBody, LParen, RParen),
+		NewRule(FunctionCallBody, LParen, FunctionCallArgs, RParen),
+		NewRule(FunctionCallArgs, FunctionArgsType),
+		NewRule(FunctionCallArgs, FunctionCallArgs, Comma, FunctionArgsType),
+
+		NewRule(FunctionArgsType, MetricExpression),
+		NewRule(FunctionArgsType, AggrExpression),
+		NewRule(FunctionArgsType, FuncExpression),
+		NewRule(FunctionArgsType, Num),
 	)
 
 	PromQLParser = NewEarleyParser(*promQLGrammar)
