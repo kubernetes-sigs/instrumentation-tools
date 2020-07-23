@@ -19,6 +19,7 @@ package earley
 
 import (
 	"fmt"
+	"sigs.k8s.io/instrumentation-tools/notstdlib/sets"
 	"strings"
 
 	"github.com/prometheus/prometheus/promql"
@@ -92,7 +93,8 @@ const (
 	ID                   TokenType = "identifier"
 	METRIC_ID            TokenType = "metric-identifier"
 	METRIC_LABEL_SUBTYPE TokenType = "metric-label-identifier"
-	FUNCTION_ID          TokenType = "function-identifier"
+	FUNCTION_SCALAR_ID   TokenType = "function-scalar-identifier"
+	FUNCTION_VECTOR_ID   TokenType = "function-vector-identifier"
 
 	OPERATOR TokenType = "operator"
 	//binary operators
@@ -117,6 +119,7 @@ const (
 	LEFT_BRACKET  TokenType = "leftbracket"
 	RIGHT_BRACKET TokenType = "rightbracket"
 	COMMA         TokenType = "comma"
+	COLON         TokenType = "colon"
 	STRING        TokenType = "string"
 	NUM           TokenType = "number"
 	DURATION      TokenType = "duration"
@@ -217,6 +220,10 @@ func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 		return AGGR_OP
 	case t == promql.METRIC_IDENTIFIER:
 		return METRIC_ID
+	case isScalarFunction(item):
+		return FUNCTION_SCALAR_ID
+	case isVectorFunction(item):
+		return FUNCTION_VECTOR_ID
 	case t == promql.IDENTIFIER:
 		return ID
 	case t == promql.LEFT_BRACE:
@@ -245,6 +252,8 @@ func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 		return OPERATOR
 	case t == promql.COMMA:
 		return COMMA
+	case t == promql.COLON:
+		return COLON
 	case t == promql.NUMBER:
 		return NUM
 	default:
@@ -260,4 +269,22 @@ func isAggregator(item promql.ItemType) bool {
 
 func isOperator(item promql.ItemType) bool {
 	return item > 57367 && item < 57385
+}
+
+func isScalarFunction(item promql.Item) bool {
+	for _, v := range sets.StringKeySet(scalarFunctions).List() {
+		if v == item.Val {
+			return true
+		}
+	}
+	return false
+}
+
+func isVectorFunction(item promql.Item) bool {
+	for _, v := range sets.StringKeySet(vectorFunctions).List() {
+		if v == item.Val {
+			return true
+		}
+	}
+	return false
 }

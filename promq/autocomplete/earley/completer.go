@@ -164,6 +164,16 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 					matches = append(matches, newMatch)
 				}
 			}
+		case FUNCTION_VECTOR_ID:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(vectorFunctions), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "label-match", vectorFunctions[ao])
+				matches = append(matches, newMatch)
+			}
+		case FUNCTION_SCALAR_ID:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(scalarFunctions), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "label-match", scalarFunctions[ao])
+				matches = append(matches, newMatch)
+			}
 		}
 		sort.Slice(matches, func(i, j int) bool {
 			return matches[i].GetValue() > matches[j].GetValue()

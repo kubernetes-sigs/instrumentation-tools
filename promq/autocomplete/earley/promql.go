@@ -20,12 +20,16 @@ type terminalType string
 
 var (
 	// non-terminals
-	Root             = NewNonTerminal("root", true)
-	Expression       = NewNonTerminal("expression", false)
-	MetricExpression = NewNonTerminal("metric-expression", false)
-	AggrExpression   = NewNonTerminal("aggr-expression", false)
-	BinaryExpression = NewNonTerminal("binary-expression", false)
-	FuncExpression   = NewNonTerminal("function-expression", false)
+	Root               = NewNonTerminal("root", true)
+	Expression         = NewNonTerminal("expression", false)
+	MetricExpression   = NewNonTerminal("metric-expression", false)
+	AggrExpression     = NewNonTerminal("aggr-expression", false)
+	BinaryExpression   = NewNonTerminal("binary-expression", false)
+	FuncExpression     = NewNonTerminal("function-expression", false)
+	SubqueryExpression = NewNonTerminal("subquery-expression", false)
+
+	VectorFuncExpression = NewNonTerminal("vector-function-expression", false)
+	ScalarFuncExpression = NewNonTerminal("scalar-function-expression", false)
 
 	MatrixSelector = NewNonTerminal("matrix-selector", false)
 	VectorSelector = NewNonTerminal("vector-selector", false)
@@ -50,12 +54,13 @@ var (
 	VectorBinaryExpression = NewNonTerminal("vector-binary-expression", false)
 
 	// terminals
-	Identifier            = NewTerminal(ID)                                  // this one is ambiguous
-	MetricIdentifier      = NewTerminalWithSubType(ID, METRIC_ID)            // this one is ambiguous
-	MetricLabelIdentifier = NewTerminalWithSubType(ID, METRIC_LABEL_SUBTYPE) // this one is ambiguous
-	FunctionIdentifier    = NewTerminalWithSubType(ID, FUNCTION_ID)
-	AggregatorOp          = NewTerminal(AGGR_OP)
+	Identifier               = NewTerminal(ID)                                  // this one is ambiguous
+	MetricIdentifier         = NewTerminalWithSubType(ID, METRIC_ID)            // this one is ambiguous
+	MetricLabelIdentifier    = NewTerminalWithSubType(ID, METRIC_LABEL_SUBTYPE) // this one is ambiguous
+	ScalarFunctionIdentifier = NewTerminalWithSubType(ID, FUNCTION_SCALAR_ID)
+	VectorFunctionIdentifier = NewTerminalWithSubType(ID, FUNCTION_VECTOR_ID)
 
+	AggregatorOp     = NewTerminal(AGGR_OP)
 	AggregateKeyword = NewTerminal(AGGR_KW)
 	BoolKeyword      = NewTerminalWithSubType(KEYWORD, BOOL_KW)
 	OffsetKeyword    = NewTerminalWithSubType(KEYWORD, OFFSET_KW)
@@ -71,6 +76,7 @@ var (
 	LBracket = NewTerminal(LEFT_BRACKET)
 	RBracket = NewTerminal(RIGHT_BRACKET)
 	Comma    = NewTerminal(COMMA)
+	Colon    = NewTerminal(COLON)
 	LParen   = NewTerminal(LEFT_PAREN)
 	RParen   = NewTerminal(RIGHT_PAREN)
 	Str      = NewTerminal(STRING)
@@ -89,14 +95,21 @@ var (
 		NewRule(Expression, AggrExpression),
 		NewRule(Expression, FuncExpression),
 		NewRule(Expression, Num),
+		NewRule(Expression, SubqueryExpression),
 
 		// EXPRESSION TYPE:
+		// 1) scalar type expression
 		NewRule(ScalarTypeExpression, ScalarBinaryExpression),
 		NewRule(ScalarTypeExpression, Num),
+		NewRule(ScalarTypeExpression, ScalarFuncExpression),
+		// 2) vector type expression
 		NewRule(VectorTypeExpression, VectorSelector),
 		NewRule(VectorTypeExpression, VectorBinaryExpression),
+		NewRule(VectorTypeExpression, VectorFuncExpression),
 		NewRule(VectorTypeExpression, AggrExpression),
+		// 3) matrix type expression
 		NewRule(MatrixTypeExpression, MatrixSelector),
+		NewRule(MatrixTypeExpression, SubqueryExpression),
 
 		// METRIC EXPRESSIONS:
 		// 1) Instant vector selectors
@@ -136,8 +149,6 @@ var (
 		NewRule(AggrExpression, AggregatorOp, AggregateKeyword, LabelsExpression, AggrCallExpression),
 		// '(metric{label="blah"})'
 		NewRule(AggrCallExpression, LParen, VectorTypeExpression, RParen),
-		// Todo(yuchen): some return of function call is scalar type
-		NewRule(AggrCallExpression, LParen, FuncExpression, RParen),
 
 		// LABEL EXPRESSIONS:
 		NewRule(LabelsExpression, LParen, MetricLabelArgs, RParen),
@@ -174,14 +185,25 @@ var (
 		NewRule(VectorBinaryExpression, VectorTypeExpression, Arithmetic, VectorTypeExpression),
 		NewRule(VectorBinaryExpression, VectorTypeExpression, Comparision, BoolKeyword, VectorTypeExpression),
 
-		//FUNCTION EXPRESSIONS:
-		//Todo(yuchen) The input args can vary from different functions. Here I only define the general rule.
-		NewRule(FuncExpression, FunctionIdentifier, FunctionCallBody),
-		// time()
+		// FUNCTION EXPRESSIONS:
+		// Todo(yuchen) The input args can vary from different functions. Here I only separate the function with different return type.
+		NewRule(FuncExpression, ScalarFuncExpression),
+		NewRule(FuncExpression, VectorTypeExpression),
+		// the functions that return vector type expression
+		NewRule(VectorTypeExpression, VectorFunctionIdentifier, FunctionCallBody),
 		NewRule(FunctionCallBody, LParen, RParen),
 		NewRule(FunctionCallBody, LParen, FunctionCallArgs, RParen),
 		NewRule(FunctionCallArgs, Expression),
 		NewRule(FunctionCallArgs, FunctionCallArgs, Comma, Expression),
+		// the functions that return scalar type expression: time() scalar(vector)
+		NewRule(ScalarFuncExpression, ScalarFunctionIdentifier, LParen, RParen),
+		NewRule(ScalarFuncExpression, ScalarFunctionIdentifier, LParen, VectorTypeExpression, RParen),
+
+		// SUBQUERY EXPRESSIONS:
+		NewRule(SubqueryExpression, VectorTypeExpression, LBracket, Duration, Colon, RBracket),
+		NewRule(SubqueryExpression, VectorTypeExpression, LBracket, Duration, Colon, Duration, RBracket),
+		NewRule(SubqueryExpression, VectorTypeExpression, LBracket, Duration, Colon, RBracket, OffsetExpression),
+		NewRule(SubqueryExpression, VectorTypeExpression, LBracket, Duration, Colon, Duration, RBracket, OffsetExpression),
 	)
 
 	PromQLParser = NewEarleyParser(*promQLGrammar)
@@ -247,5 +269,58 @@ var (
 		"d": "days",
 		"w": "weeks",
 		"y": "years",
+	}
+
+	scalarFunctions = map[string]string{
+		"time":   "time() returns the time at which the expression is to be evaluated in seconds ",
+		"scalar": "given a single-element input vector, scalar(v instant-vector) returns the sample value of that single element as a scalar.",
+	}
+
+	vectorFunctions = map[string]string{
+		"abs":                "abs(v instant-vector) returns the input vector with all sample values converted to their absolute value",
+		"absent":             "absent(v instant-vector) returns an empty vector if the vector passed to it has any elements and a 1-element vector with the value 1 if the vector passed to it has no elements",
+		"absent_over_time":   "absent_over_time(v range-vector) returns an empty vector if the range vector passed to it has any elements and a 1-element vector with the value 1 if the range vector passed to it has no elements",
+		"avg_over_time":      "avg_over_time(v range-vector) returns the average value of all points in the specified interval",
+		"ceil":               "ceil(v instant-vector) rounds the sample values of all elements in input vector up to the nearest integer",
+		"changes":            "for each input time series, changes(v range-vector) returns the number of times its value has changed within the provided time range as an instant vector.",
+		"clamp_max":          "clamp_max(v instant-vector, max scalar) clamps the sample values of all elements in v to have an upper limit of max",
+		"clamp_min":          "clamp_min(v instant-vector, min scalar) clamps the sample values of all elements in v to have a lower limit of min",
+		"count_over_time":    "count_over_time(v range-vector) returns the count of all values in the specified interval",
+		"days_in_month":      "days_in_month(v=vector(time()) instant-vector) returns number of days in the month for each of the given times in UTC",
+		"day_of_month":       "day_of_month(v=vector(time()) instant-vector) returns the day of the month for each of the given times in UTC",
+		"day_of_week":        "day_of_week(v=vector(time()) instant-vector) returns the day of the week for each of the given times in UTC",
+		"delta":              "delta(v range-vector) calculates the difference between the first and last value of each time series element in a range vector v, returning an instant vector with the given deltas and equivalent labels",
+		"deriv":              "deriv(v range-vector) calculates the per-second derivative of the time series in a range vector v. deriv should only be used with gauges.",
+		"exp":                "exp(v instant-vector) calculates the exponential function for all elements in v",
+		"floor":              "floor(v instant-vector) rounds the sample values of all elements in v down to the nearest integer",
+		"histogram_quantile": "histogram_quantile(φ float, b instant-vector) calculates the φ-quantile (0 ≤ φ ≤ 1) from the buckets b of a histogram",
+		"holt_winters":       "holt_winters(v range-vector, sf scalar, tf scalar) produces a smoothed value for time series based on the range in v",
+		"hour":               "hour(v=vector(time()) instant-vector) returns the hour of the day for each of the given times in UTC",
+		"idelta":             "idelta(v range-vector) calculates the difference between the last two samples in the range vector v, returning an instant vector with the given deltas and equivalent labels",
+		"increase":           "increase(v range-vector) calculates the increase in the time series in the range vector",
+		"irate":              "irate(v range-vector) calculates the per-second instant rate of increase of the time series in the range vector",
+		"label_replace":      "for each timeseries in v, label_replace(v instant-vector, dst_label string, replacement string, src_label string, regex string) matches the regular expression regex against the label src_label. If it matches, then the timeseries is returned with the label dst_label replaced by the expansion of replacement.",
+		"label_join":         "for each timeseries in v, label_join(v instant-vector, dst_label string, separator string, src_label_1 string, src_label_2 string, ...) joins all the values of all the src_labels using separator and returns the timeseries with the label dst_label containing the joined value.",
+		"ln":                 "ln(v instant-vector) calculates the natural logarithm for all elements in v",
+		"log10":              "log10(v instant-vector) calculates the decimal logarithm for all elements in v",
+		"log2":               "log2(v instant-vector) calculates the binary logarithm for all elements in v",
+		"max_over_time":      "max_over_time(range-vector) returns the maximum value of all points in the specified interval",
+		"min_over_time":      "min_over_time(range-vector) returns the minimum value of all points in the specified interval",
+		"minute":             "minute(v=vector(time()) instant-vector) returns the minute of the hour for each of the given times in UTC",
+		"month":              "month(v=vector(time()) instant-vector) returns the month of the year for each of the given times in UTC",
+		"predict_linear":     "predict_linear(v range-vector, t scalar) predicts the value of time series t seconds from now, based on the range vector v",
+		"quantile_over_time": "quantile_over_time(scalar, range-vector) returns the φ-quantile (0 ≤ φ ≤ 1) of the values in the specified interval",
+		"rate":               "rate(v range-vector) calculates the per-second average rate of increase of the time series in the range vector",
+		"resets":             "for each input time series, resets(v range-vector) returns the number of counter resets within the provided time range as an instant vector",
+		"round":              "round(v instant-vector, to_nearest=1 scalar) rounds the sample values of all elements in v to the nearest integer",
+		"sort":               "sort(v instant-vector) returns vector elements sorted by their sample values, in ascending order",
+		"sort_desc":          "sort(v instant-vector) returns vector elements sorted by their sample values, in descending order",
+		"sqrt":               "sqrt(v instant-vector) calculates the square root of all elements in v",
+		"stddev_over_time":   "stddev_over_time(range-vector) returns the population standard deviation of the values in the specified interval",
+		"stdvar_over_time":   "stdvar_over_time(range-vector) returns the population standard variance of the values in the specified interval",
+		"sum_over_time":      "sum_over_time(range-vector) returns the sum of all values in the specified interval",
+		"timestamp":          "timestamp(v instant-vector) returns the timestamp of each of the samples of the given vector as the number of seconds",
+		"vector":             "vector(s scalar) returns the scalar s as a vector with no labels",
+		"year":               "year(v=vector(time()) instant-vector) returns the year for each of the given times in UTC",
 	}
 )

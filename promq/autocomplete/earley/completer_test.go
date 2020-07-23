@@ -107,7 +107,7 @@ func TestEndToEndAutoCompletion(t *testing.T) {
 		{
 			desc:            "completes on empty string",
 			query:           ``,
-			expectedMatches: sets.NewString("metric_name_one", "metric_name_two").Union(sets.StringKeySet(aggregators)),
+			expectedMatches: sets.NewString("metric_name_one", "metric_name_two").Union(sets.StringKeySet(aggregators)).Union(sets.StringKeySet(scalarFunctions)).Union(sets.StringKeySet(vectorFunctions)),
 		},
 	}
 
