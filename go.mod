@@ -21,6 +21,12 @@ require (
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.7.0
 	github.com/pkg/term v0.0.0-20200520122047-c3ffed290a03 // indirect
+	github.com/prometheus/client_golang v1.2.0
 	github.com/prometheus/prometheus v1.8.2-0.20200213233353-b90be6f32a33
+	github.com/spf13/cobra v0.0.5
+	github.com/spf13/pflag v1.0.5
 	gopkg.in/yaml.v2 v2.2.8
+	k8s.io/apimachinery v0.0.0-20200307122051-2b7fa1cb5395
+	k8s.io/cli-runtime v0.0.0-00010101000000-000000000000
+	k8s.io/client-go v0.0.0-20200307122516-5194bac86967
 )
