@@ -18,6 +18,7 @@ package term
 
 import (
 	"context"
+	"errors"
 	"github.com/c-bata/go-prompt"
 	"github.com/gdamore/tcell"
 )
@@ -35,12 +36,16 @@ type PromptView struct {
 
 	SetupPrompt func(requiredOpts ...prompt.Option) *prompt.Prompt
 	HandleInput func(input string) (text *string, stop bool)
+	OnSetup func()
 }
 
 func (v *PromptView) SetBox(box PositionBox) {
 	v.pos = box
-	v.writer.SetBox(box)
-	v.reader.Resize(&prompt.WinSize{Row: uint16(v.writer.rows), Col: uint16(v.writer.cols)})
+	if v.reader != nil && v.writer != nil {
+		v.writer.SetBox(box)
+		v.reader.Resize(&prompt.WinSize{Row: uint16(v.writer.rows), Col: uint16(v.writer.cols)})
+	}
+
 	if v.start != nil {
 		close(v.start)
 		v.start = nil
@@ -63,6 +68,15 @@ func (v *PromptView) Run(ctx context.Context, initialInput *string, shutdownScre
 	viewPrompt := v.SetupPrompt(prompt.OptionParser(v.reader), prompt.OptionWriter(v.writer))
 	start := make(chan struct{})
 	v.start = start
+
+	// we've already been asked to start
+	if v.pos != (PositionBox{}) {
+		v.SetBox(v.pos)
+	}
+
+	if v.OnSetup != nil {
+		v.OnSetup()
+	}
 
 	go func() {
 		<-start
@@ -95,5 +109,8 @@ func (v *PromptView) Run(ctx context.Context, initialInput *string, shutdownScre
 
 	<-ctx.Done()
 
+	if err := ctx.Err(); !errors.Is(err, context.Canceled) {
+		return err
+	}
 	return nil
 }
