@@ -137,6 +137,11 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 				newMatch := NewPartialMatch(ao, "arithmetic", arithmaticOperators[ao])
 				matches = append(matches, newMatch)
 			}
+		case COMPARISION:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(comparisionOperators), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "comparision", comparisionOperators[ao])
+				matches = append(matches, newMatch)
+			}
 		case LOGICAL:
 			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(logicalOperators), autocompletePrefix, false).List() {
 				newMatch := NewPartialMatch(ao, "logical", logicalOperators[ao])

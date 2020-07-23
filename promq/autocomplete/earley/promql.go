@@ -20,7 +20,8 @@ type terminalType string
 
 var (
 	// non-terminals
-	Expression       = NewNonTerminal("expression", true)
+	Root             = NewNonTerminal("root", true)
+	Expression       = NewNonTerminal("expression", false)
 	MetricExpression = NewNonTerminal("metric-expression", false)
 	AggrExpression   = NewNonTerminal("aggr-expression", false)
 	BinaryExpression = NewNonTerminal("binary-expression", false)
@@ -40,7 +41,13 @@ var (
 
 	FunctionCallBody = NewNonTerminal("function-call-body", false)
 	FunctionCallArgs = NewNonTerminal("function-call-args", false)
-	FunctionArgsType = NewNonTerminal("function-args-type", false)
+
+	// Expression types:
+	ScalarTypeExpression   = NewNonTerminal("scalar-type-expression", false)
+	VectorTypeExpression   = NewNonTerminal("vector-type-expression", false)
+	MatrixTypeExpression   = NewNonTerminal("matrix-type-expression", false)
+	ScalarBinaryExpression = NewNonTerminal("scalar-binary-expression", false)
+	VectorBinaryExpression = NewNonTerminal("vector-binary-expression", false)
 
 	// terminals
 	Identifier            = NewTerminal(ID)                                  // this one is ambiguous
@@ -73,12 +80,23 @@ var (
 
 	promQLGrammar = NewGrammar(
 
+		//START RULE:
+		NewRule(Root, Expression, Eof),
 		// TOP LEVEL RULES:
 		// 1) an expression can be a metric/binary/aggr/function expression
-		NewRule(Expression, MetricExpression, Eof),
-		NewRule(Expression, BinaryExpression, Eof),
-		NewRule(Expression, AggrExpression, Eof),
-		NewRule(Expression, FuncExpression, Eof),
+		NewRule(Expression, MetricExpression),
+		NewRule(Expression, BinaryExpression),
+		NewRule(Expression, AggrExpression),
+		NewRule(Expression, FuncExpression),
+		NewRule(Expression, Num),
+
+		// EXPRESSION TYPE:
+		NewRule(ScalarTypeExpression, ScalarBinaryExpression),
+		NewRule(ScalarTypeExpression, Num),
+		NewRule(VectorTypeExpression, VectorSelector),
+		NewRule(VectorTypeExpression, VectorBinaryExpression),
+		NewRule(VectorTypeExpression, AggrExpression),
+		NewRule(MatrixTypeExpression, MatrixSelector),
 
 		// METRIC EXPRESSIONS:
 		// 1) Instant vector selectors
@@ -117,7 +135,9 @@ var (
 		// sum by (label) (metric)
 		NewRule(AggrExpression, AggregatorOp, AggregateKeyword, LabelsExpression, AggrCallExpression),
 		// '(metric{label="blah"})'
-		NewRule(AggrCallExpression, LParen, VectorSelector, RParen),
+		NewRule(AggrCallExpression, LParen, VectorTypeExpression, RParen),
+		// Todo(yuchen): some return of function call is scalar type
+		NewRule(AggrCallExpression, LParen, FuncExpression, RParen),
 
 		// LABEL EXPRESSIONS:
 		NewRule(LabelsExpression, LParen, MetricLabelArgs, RParen),
@@ -136,12 +156,23 @@ var (
 		//NewRule(LabelValueExpression, LBrace, MetricLabelIdentifier, Operator, Str, RBrace),
 
 		// BINARY EXPRESSIONS:
-		// 1 + 1
-		NewRule(BinaryExpression, BinaryExpression, Arithmetic, Num),
-		NewRule(BinaryExpression, BinaryExpression, Comparision, BoolKeyword, Num),
-		// 1 == 1
-		NewRule(BinaryExpression, Num, Arithmetic, Num),
-		NewRule(BinaryExpression, Num, Comparision, BoolKeyword, Num),
+		// 1) scalar type binary expr: both left and right are scalar type
+		NewRule(BinaryExpression, ScalarBinaryExpression),
+		// 2) vector type binary expr
+		NewRule(BinaryExpression, VectorBinaryExpression),
+
+		// Todo(yuchen): some function call will also return scalar type expression(e.g. time(), scalar())
+		NewRule(ScalarBinaryExpression, ScalarTypeExpression, Arithmetic, ScalarTypeExpression),
+		NewRule(ScalarBinaryExpression, ScalarTypeExpression, Comparision, BoolKeyword, ScalarTypeExpression),
+		//NewRule(ScalarBinaryExpression, ScalarBinaryExpression, Arithmetic, Num),
+		//NewRule(ScalarBinaryExpression, ScalarBinaryExpression, Comparision, BoolKeyword, Num),
+
+		NewRule(VectorBinaryExpression, ScalarTypeExpression, Arithmetic, VectorTypeExpression),
+		NewRule(VectorBinaryExpression, ScalarTypeExpression, Comparision, BoolKeyword, VectorTypeExpression),
+		NewRule(VectorBinaryExpression, VectorTypeExpression, Arithmetic, ScalarTypeExpression),
+		NewRule(VectorBinaryExpression, VectorTypeExpression, Comparision, BoolKeyword, ScalarTypeExpression),
+		NewRule(VectorBinaryExpression, VectorTypeExpression, Arithmetic, VectorTypeExpression),
+		NewRule(VectorBinaryExpression, VectorTypeExpression, Comparision, BoolKeyword, VectorTypeExpression),
 
 		//FUNCTION EXPRESSIONS:
 		//Todo(yuchen) The input args can vary from different functions. Here I only define the general rule.
@@ -149,13 +180,8 @@ var (
 		// time()
 		NewRule(FunctionCallBody, LParen, RParen),
 		NewRule(FunctionCallBody, LParen, FunctionCallArgs, RParen),
-		NewRule(FunctionCallArgs, FunctionArgsType),
-		NewRule(FunctionCallArgs, FunctionCallArgs, Comma, FunctionArgsType),
-
-		NewRule(FunctionArgsType, MetricExpression),
-		NewRule(FunctionArgsType, AggrExpression),
-		NewRule(FunctionArgsType, FuncExpression),
-		NewRule(FunctionArgsType, Num),
+		NewRule(FunctionCallArgs, Expression),
+		NewRule(FunctionCallArgs, FunctionCallArgs, Comma, Expression),
 	)
 
 	PromQLParser = NewEarleyParser(*promQLGrammar)

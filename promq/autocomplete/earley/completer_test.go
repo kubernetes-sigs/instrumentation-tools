@@ -97,7 +97,7 @@ func TestEndToEndAutoCompletion(t *testing.T) {
 		{
 			desc:            "completes on aggregation keywords",
 			query:           `sum(metric_name_one)`,
-			expectedMatches: sets.NewString("without", "by"),
+			expectedMatches: sets.NewString("without", "by").Union(sets.StringKeySet(arithmaticOperators)).Union(sets.StringKeySet(comparisionOperators)),
 		},
 		{
 			desc:            "completes on metric name",
