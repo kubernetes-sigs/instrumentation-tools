@@ -10,19 +10,19 @@ With the `promq` executable binary, you can execute arbitrary promql queries aga
 valid prometheus metric data. This allows you to query for specific metrics, like so:
 
 ```bash
-$ promq metrics -q apiserver_request_count
+$ promq -q apiserver_request_count
 ```
 
 In line with Kubernetes conventions, you can also specify your returned data format:
 
 ```bash
-$ promq metrics -q apiserver_request_count -oyaml
+$ promq -q apiserver_request_count -oyaml
 ```
 
 If you need more complicated queries, `promq` allows you to evaluate arbitrarily complex promql queries:
 
 ```bash
-$ promq metrics -q 'sum(apiserver_request_count{verb="POST"}) by (resource, code)'
+$ promq -q 'sum(apiserver_request_count{verb="POST"}) by (resource, code)'
 ```
 
 If you want to run promq interactively, you can! PQ can continuously scrape a prometheus endpoint 
@@ -41,7 +41,7 @@ TODO(sollyross)
 
 ## PromQL Code Completion
 
-`promq` provides   
+`promq` comes with promql code completion.  
 
 ### Building from source
 

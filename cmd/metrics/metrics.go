@@ -168,16 +168,6 @@ func (c *MetricsCommand) Run(flags cli.PromQFlags) error {
 		return c.outputMetricNames(metrics)
 	}
 	query := flags.PromQuery
-	if !flags.Continuous && query == "" {
-		if query == "" {
-			c.Fprintf("Listing all metrics:\n")
-			for _, m := range metrics {
-				c.Fprintf("Metric\nLabels: %v\nValue:%v\n", m.Labels, m.Value)
-			}
-			return nil
-		}
-	}
-
 	timeoutDur := c.Period
 	runner := prom.NewPeriodicData(c.sources, prom.DefaultEngineOptions(timeoutDur, 100000))
 
@@ -198,6 +188,9 @@ func (c *MetricsCommand) Run(flags cli.PromQFlags) error {
 			return err
 		}
 	} else {
+		if query == "" {
+			query = "{__name__=~\"..*\"}" // match everything
+		}
 		if err := runner.SetQuery(ctx, query); err != nil {
 			return err
 		}
@@ -261,7 +254,7 @@ func (c *MetricsCommand) outputMetricNames(metrics []prom.ParsedSeries) error {
 	}
 	// iterate through a sorted list of our set (our output is deterministic).
 	for _, n := range metricNames.List() {
-		c.Fprintf("%v\n", n)
+		c.Fprintf("--%v\n", n)
 	}
 	return nil
 }
