@@ -33,21 +33,32 @@ type screenIsh interface {
 }
 
 type cellWriter struct {
+	// NB(directxman12): unlike most other stuff, since this is involved in a
+	// persistent operation separate from the draw thread, we need to lock it,
+	// since the draw thread is free to do stuff like send us resizes while
+	// we're using our size.
+	//
+	// All operations touching the text member must be done under this lock
+	textMu sync.Mutex
+
 	screen screenIsh
 	startRow, startCol int
 
-	textWrapper
+	text textWrapper
 
 	currentStyle tcell.Style
 }
 
 func (w *cellWriter) SetBox(box PositionBox) {
+	w.textMu.Lock()
+	defer w.textMu.Unlock()
+
 	w.startCol = box.StartCol
 	w.startRow = box.StartRow
-	w.rows = box.Rows
-	w.cols = box.Cols
+	w.text.rows = box.Rows
+	w.text.cols = box.Cols
 
-	w.buf.Resize(box.Cols, box.Rows)
+	w.text.buf.Resize(box.Cols, box.Rows)
 }
 
 func (w *cellWriter) WriteRaw(data []byte) {
@@ -119,12 +130,16 @@ type screenParser struct {
 	leftOvers []byte
 	mu sync.Mutex
 }
-func (screenParser) Setup() error {
+// these are pointers so that we don't copy the mutex,
+// which isn't a big deal here cause we're not using it,
+// but makes the race detector sad anyway
+func (*screenParser) Setup() error {
 	return nil
 }
-func (screenParser) TearDown() error {
+func (*screenParser) TearDown() error {
 	return nil
 }
+
 func (p *screenParser) GetWinSize() *prompt.WinSize {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -201,4 +216,102 @@ func (p *screenParser) AddString(str string) {
 	for _, rn := range str {
 		p.evts <- tcell.NewEventKey(tcell.KeyRune, rn, 0)
 	}
+}
+
+// below are threadsafe wrappers around textWrapper
+
+func (t *cellWriter) Resize(cols, rows int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.Resize(cols, rows)
+}
+func (t *cellWriter) Reset() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.Reset()
+}
+func (t *cellWriter) Newline() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.Newline()
+}
+func (t *cellWriter) WriteString(str string, sty tcell.Style) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.WriteString(str, sty)
+}
+func (t *cellWriter) FlushTo(screen tcell.Screen, startCol, startRow int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.FlushTo(screen, startCol, startRow)
+}
+func (t *cellWriter) ScrollDown() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.ScrollDown()
+}
+func (t *cellWriter) ScrollUp() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.ScrollUp()
+}
+func (t *cellWriter) Erase() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.Erase()
+}
+func (t *cellWriter) EraseUp() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.EraseUp()
+}
+func (t *cellWriter) EraseDown() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.EraseDown()
+}
+func (t *cellWriter) EraseStartOfLine() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.EraseStartOfLine()
+}
+func (t *cellWriter) EraseEndOfLine() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.EraseEndOfLine()
+}
+func (t *cellWriter) EraseLine() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.EraseLine()
+}
+func (t *cellWriter) CursorForward(n int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.CursorForward(n)
+}
+func (t *cellWriter) CursorBackward(n int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.CursorBackward(n)
+}
+func (t *cellWriter) CursorPosition() (col, row int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	return t.text.CursorPosition()
+}
+func (t *cellWriter) CursorGoTo(row, col int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.CursorGoTo(row, col)
+}
+func (t *cellWriter) CursorDown(n int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.CursorDown(n)
+}
+func (t *cellWriter) CursorUp(n int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.CursorUp(n)
 }

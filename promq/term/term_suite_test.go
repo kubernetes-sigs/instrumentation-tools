@@ -23,7 +23,7 @@ import (
     . "github.com/onsi/gomega"
 )
 
-func TestBooks(t *testing.T) {
+func TestTerminal(t *testing.T) {
     RegisterFailHandler(Fail)
     RunSpecs(t, "Terminal Suite")
 }

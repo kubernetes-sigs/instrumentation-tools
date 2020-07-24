@@ -23,10 +23,9 @@ import (
 	"github.com/gdamore/tcell"
 )
 
-// TODO: since we keep this around, we might actually need a mutex here
-
 type PromptView struct {
 	writer *cellWriter
+
 	reader *screenParser
 
 	Screen screenIsh
@@ -43,7 +42,7 @@ func (v *PromptView) SetBox(box PositionBox) {
 	v.pos = box
 	if v.reader != nil && v.writer != nil {
 		v.writer.SetBox(box)
-		v.reader.Resize(&prompt.WinSize{Row: uint16(v.writer.rows), Col: uint16(v.writer.cols)})
+		v.reader.Resize(&prompt.WinSize{Row: uint16(box.Rows), Col: uint16(box.Cols)})
 	}
 
 	if v.start != nil {
@@ -93,6 +92,7 @@ func (v *PromptView) Run(ctx context.Context, initialInput *string, shutdownScre
 			output, stop := v.HandleInput(input)
 			if output != nil {
 				v.writer.WriteStr(*output)
+				v.writer.Flush() // always flush after we write
 			}
 			if stop {
 				shutdownScreen()

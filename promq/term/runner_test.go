@@ -18,6 +18,7 @@ package term_test
 
 import (
 	"context"
+	"sync"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -27,20 +28,36 @@ import (
 )
 
 type oneRuneView struct {
-	term.StaticResizable
+	pos term.PositionBox
 	targetRune rune
+	mu sync.Mutex
 }
-func (v oneRuneView) FlushTo(screen tcell.Screen) {
+func (v *oneRuneView) FlushTo(screen tcell.Screen) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
 	if v.targetRune != rune(0) {
-		screen.SetContent(0, 0, v.targetRune, nil, tcell.StyleDefault)
+		screen.SetContent(v.pos.StartCol, v.pos.StartRow, v.targetRune, nil, tcell.StyleDefault)
 	} else {
-		screen.SetContent(0, 0, '*', nil, tcell.StyleDefault)
+		screen.SetContent(v.pos.StartCol, v.pos.StartRow, '*', nil, tcell.StyleDefault)
 	}
 }
+func (v *oneRuneView) SetBox(box term.PositionBox) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
 
-// waitForLoopStart waits for the runner to start polling, since tcell silently
+	v.pos = box
+}
+func (v *oneRuneView) GetBox() term.PositionBox {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	return v.pos
+}
+
+// waitForPollingStart waits for the runner to start polling, since tcell silently
 // drops events until something is polling.
-func waitForLoopStart(screen tcell.SimulationScreen, keys <-chan *tcell.EventKey) {
+func waitForPollingStart(screen tcell.SimulationScreen, keys <-chan *tcell.EventKey) {
 	EventuallyWithOffset(1, func() bool {
 		screen.InjectKey(tcell.KeyRune, ' ', tcell.ModNone)
 		select {
@@ -51,7 +68,6 @@ func waitForLoopStart(screen tcell.SimulationScreen, keys <-chan *tcell.EventKey
 		}
 	}).Should(BeTrue())
 }
-
 var _ = Describe("The overall Runner", func() {
 	var (
 		screen tcell.SimulationScreen
@@ -61,9 +77,6 @@ var _ = Describe("The overall Runner", func() {
 		runner *term.Runner
 		mainView *oneRuneView = &oneRuneView{}
 		initialView term.View
-
-		// waitForLoopStart waits for the runner to start polling the screen, since
-		// tcell silently drops events until something is polling.
 	)
 	BeforeEach(func() {
 		screen = tcell.NewSimulationScreen("")
@@ -72,13 +85,18 @@ var _ = Describe("The overall Runner", func() {
 	JustBeforeEach(func() {
 		*mainView = oneRuneView{}
 
+		startedCh := make(chan struct{})
 		keys = make(chan *tcell.EventKey, 10 /* some buffer to avoid blocking */)
+		localKeys := keys // avoid racing on shutdown, etc
 		runner = &term.Runner{
 			MakeScreen: func() (tcell.Screen, error) {
 				return screen, nil
 			},
 			KeyHandler: func(key *tcell.EventKey) {
-				keys <- key
+				localKeys <- key
+			},
+			OnStart: func() {
+				close(startedCh)
 			},
 		}
 		var ctx context.Context
@@ -96,8 +114,10 @@ var _ = Describe("The overall Runner", func() {
 		}()
 
 		// NB(directxman12): events are discarded until we start polling for them,
-		// so send a bunch of keys until we get one, then proceed.
-		waitForLoopStart(screen, keys)
+		// so wait till we're started, send keys until we get a result, then proceed
+		<-startedCh
+		waitForPollingStart(screen, keys)
+
 		screen.SetSize(10, 10)
 	})
 	AfterEach(func() {
@@ -170,7 +190,7 @@ var _ = Describe("The overall Runner", func() {
 		})
 
 		It("should resize the main view", func() {
-			Eventually(func() term.PositionBox { return mainView.PositionBox }).Should(Equal(term.PositionBox{Rows: 13, Cols: 12}))
+			Eventually(func() term.PositionBox { return mainView.GetBox() }).Should(Equal(term.PositionBox{Rows: 13, Cols: 12}))
 		})
 
 		It("should repaint the main view", func() {

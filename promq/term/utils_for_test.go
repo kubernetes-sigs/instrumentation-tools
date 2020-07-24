@@ -45,24 +45,10 @@ func (m *cellsMatcher) onScreen(contents term.Flushable) tcell.SimulationScreen 
 
 	return screen
 }
-func (m *cellsMatcher) Match(actual interface{}) (bool, error) {
-	if m.expected == nil && actual == nil {
-		return false, fmt.Errorf("Refusing to compare <nil> to <nnil>")
-	}
-	
+
+func (m *cellsMatcher) matchWithContents(actualCells []tcell.SimCell) (bool, error) {
 	expectedCells, _, _ := m.expected.GetContents()
 
-	var (
-		actualCells []tcell.SimCell
-	)
-	switch actual := actual.(type) {
-	case term.Flushable:
-		actualCells = m.onScreenAsCells(actual)
-	case tcell.SimulationScreen:
-		actualCells, _, _ = actual.GetContents()
-	default:
-		return reflect.DeepEqual(expectedCells, actual), nil
-	}
 	if !m.contentsOnly {
 		return reflect.DeepEqual(expectedCells, actualCells), nil
 	}
@@ -78,41 +64,90 @@ func (m *cellsMatcher) Match(actual interface{}) (bool, error) {
 
 	return reflect.DeepEqual(expectedRunes, actualRunes), nil
 }
-
-func (m *cellsMatcher) FailureMessage(actual interface{}) string {
-	var actualScreen tcell.SimulationScreen
+func (m *cellsMatcher) Match(actual interface{}) (bool, error) {
+	if m.expected == nil && actual == nil {
+		return false, fmt.Errorf("Refusing to compare <nil> to <nnil>")
+	}
+	
 	switch actual := actual.(type) {
 	case term.Flushable:
-		actualScreen = m.onScreen(actual)
+		actualCells := m.onScreenAsCells(actual)
+		return m.matchWithContents(actualCells)
 	case tcell.SimulationScreen:
-		actualScreen = actual
+		actualCells, _, _ := actual.GetContents()
+		return m.matchWithContents(actualCells)
+	case LockableScreen:
+		var matches bool
+		var err error
+		actual.WithScreen(func(actual tcell.SimulationScreen) {
+			actualCells, _, _ := actual.GetContents()
+			matches, err = m.matchWithContents(actualCells)
+		})
+		return matches, err
+	default:
+		expectedCells, _, _ := m.expected.GetContents()
+		return reflect.DeepEqual(expectedCells, actual), nil
+	}
+}
+
+func (m *cellsMatcher) FailureMessage(actual interface{}) string {
+	var withScreen func(func(tcell.SimulationScreen))
+
+	switch actual := actual.(type) {
+	case term.Flushable:
+		actualScreen := m.onScreen(actual)
+		withScreen = func(cb func(tcell.SimulationScreen)) {
+			cb(actualScreen)
+		}
+	case tcell.SimulationScreen:
+		 withScreen = func(cb func(tcell.SimulationScreen)) {
+			cb(actual)
+		}
+	case LockableScreen:
+		withScreen = actual.WithScreen
 	default:
 		return format.Message(actual, "to equal", displayCells(m.expected))
 	}
 
-	if m.contentsOnly {
-		return format.Message("\n"+displayCells(actualScreen), "to equal (ignoring style)", "\n"+displayCells(m.expected))
-	} else {
-		return format.Message("\n"+displayCells(actualScreen), "to equal (including style, not shown)", "\n"+displayCells(m.expected))
-	}
+	var res string
+	withScreen(func(actualScreen tcell.SimulationScreen) {
+		if m.contentsOnly {
+			res = format.Message("\n"+displayCells(actualScreen), "to equal (ignoring style)", "\n"+displayCells(m.expected))
+		} else {
+			res = format.Message("\n"+displayCells(actualScreen), "to equal (including style, not shown)", "\n"+displayCells(m.expected))
+		}
+	})
+	return res
 }
 
 func (m *cellsMatcher) NegatedFailureMessage(actual interface{}) string {
-	var actualScreen tcell.SimulationScreen
+	var withScreen func(func(tcell.SimulationScreen))
+
 	switch actual := actual.(type) {
 	case term.Flushable:
-		actualScreen = m.onScreen(actual)
+		actualScreen := m.onScreen(actual)
+		withScreen = func(cb func(tcell.SimulationScreen)) {
+			cb(actualScreen)
+		}
 	case tcell.SimulationScreen:
-		actualScreen = actual
+		withScreen = func(cb func(tcell.SimulationScreen)) {
+			cb(actual)
+		}
+	case LockableScreen:
+		withScreen = actual.WithScreen
 	default:
 		return format.Message(actual, "not to equal", displayCells(m.expected))
 	}
-	
-	if m.contentsOnly {
-		return format.Message("\n"+displayCells(actualScreen), "not to equal (ignoring style)", "\n"+displayCells(m.expected))
-	} else {
-		return format.Message("\n"+displayCells(actualScreen), "not to equal (including style, not shown)", "\n"+displayCells(m.expected))
-	}
+
+	var res string
+	withScreen(func(actualScreen tcell.SimulationScreen) {
+		if m.contentsOnly {
+			res = format.Message("\n"+displayCells(actualScreen), "not to equal (ignoring style)", "\n"+displayCells(m.expected))
+		} else {
+			res = format.Message("\n"+displayCells(actualScreen), "not to equal (including style, not shown)", "\n"+displayCells(m.expected))
+		}
+	})
+	return res
 }
 
 // displayCells displays the given cells w/o formatting as they'd be displayed
@@ -224,4 +259,8 @@ func DisplayWithCells(width, height int, cells ...tcell.SimCell) types.GomegaMat
 	expected.Show()
 
 	return &cellsMatcher{expected: expected}
+}
+
+type LockableScreen interface {
+	WithScreen(func(tcell.SimulationScreen))
 }

@@ -36,6 +36,8 @@ type Runner struct {
 	
 	// MakeScreen allows custom screens to be used.  Mainly useful for testing.
 	MakeScreen func() (tcell.Screen, error)
+
+	OnStart func()
 }
 
 func (r *Runner) Run(ctx context.Context, initialView View) error {
@@ -68,6 +70,9 @@ func (r *Runner) Run(ctx context.Context, initialView View) error {
 		screen.Show()
 	}
 	go func() {
+		if r.OnStart != nil {
+			r.OnStart()
+		}
 		for evt := screen.PollEvent(); evt != nil; evt = screen.PollEvent() {
 			screenCols, screenRows := screen.Size()
 			switch evt := evt.(type) {

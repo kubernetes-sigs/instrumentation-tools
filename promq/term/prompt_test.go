@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 	"fmt"
+	"sync"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -30,20 +31,36 @@ import (
 )
 
 // fakeScreenish wraps a simulationScreen to allow us to quickly test the
-// prompt widget w/o using a whole runner.
+// prompt widget w/o using a whole runner.  It's threadsafe, unlike SimulationScreen.
+// Use WithScreen if you want threadsafe access to the underlying screen.
 type fakeScreenish struct {
+	mu sync.Mutex
 	screen tcell.SimulationScreen
 	view term.Flushable
 }
 func (s *fakeScreenish) ShowCursor(col, row int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.screen.ShowCursor(col, row)
 }
 func (s *fakeScreenish) HideCursor() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.screen.HideCursor()
 }
 func (s *fakeScreenish) RequestRepaint() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.view.FlushTo(s.screen)
 	s.screen.Show()
+}
+// WithScreen provides threadsafe access to the underlying SimulationScreen.
+// The SimulationScreen passed to the callback is not valid beyond the body of
+// the callback.
+func (s *fakeScreenish) WithScreen(cb func(tcell.SimulationScreen)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cb(s.screen)
 }
 
 // sendRuneKeys sends strings with keypresses that consist of single-rune
@@ -58,7 +75,7 @@ func sendRuneKeys(str string, pr *term.PromptView) {
 
 var _ = Describe("The Prompt widget", func() {
 	var (
-		screen tcell.SimulationScreen
+		screen *fakeScreenish
 		prompt *term.PromptView
 		waitForSetup chan struct{}
 
@@ -74,9 +91,9 @@ var _ = Describe("The Prompt widget", func() {
 		cancel context.CancelFunc
 	)
 	BeforeEach(func() {
-		screen = tcell.NewSimulationScreen("")
-		screen.Init()
-		screen.SetSize(50, 10)
+		rawScreen := tcell.NewSimulationScreen("")
+		rawScreen.Init()
+		rawScreen.SetSize(50, 10)
 		waitForSetup = make(chan struct{})
 
 		prompt = &term.PromptView{
@@ -92,17 +109,20 @@ var _ = Describe("The Prompt widget", func() {
 			},
 		}
 
-		prompt.Screen = &fakeScreenish{
-			screen: screen,
+		screen = &fakeScreenish{
+			screen: rawScreen,
 			view: prompt,
 		}
+		prompt.Screen = screen
 
 		prompt.SetBox(term.PositionBox{Rows: 10, Cols: 50})
 
 		ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
 	})
 	AfterEach(func() {
-		screen.Fini()
+		screen.WithScreen(func(s tcell.SimulationScreen) {
+			s.Fini()
+		})
 		cancel()
 	})
 
@@ -271,14 +291,20 @@ var _ = Describe("The Prompt widget", func() {
 
 			By("using a box smaller than the screen box & marking the end manually")
 			prompt.SetBox(term.PositionBox{Cols: 40, Rows: 7})
-			screen.SetContent(0, 7, '*', nil, tcell.StyleDefault)
-			screen.SetContent(45, 0, '*', nil, tcell.StyleDefault)
+			screen.WithScreen(func(screen tcell.SimulationScreen) {
+				screen.SetContent(0, 7, '*', nil, tcell.StyleDefault)
+				screen.SetContent(45, 0, '*', nil, tcell.StyleDefault)
+			})
 
 			By("entering in a few lines of text, and checking that we scrolled")
 			sendRuneKeys("cheddar\r", prompt)
 			sendRuneKeys("pepper jack\r", prompt)
 			sendRuneKeys("monterey jack\r", prompt)
 			sendRuneKeys("wensleydale\r", prompt)
+			// TODO(directxman12): there's a *really* weird race here around
+			// the displaying of the old two lines (monterey jack &
+			// wensleydale).  I'm not sure why or how to correctly reproduce :-/
+			// Set this to skip if it becomes a problem.
 			Eventually(screen).Should(DisplayLike(50, 10,
 				"> monterey jack                              *    "+
 				"> wensleydale                                     "+
@@ -339,8 +365,10 @@ var _ = Describe("The Prompt widget", func() {
 			Expect(prompt.Run(ctx, &initialInput, cancel)).To(Succeed())
 
 			// normally the main loop would handle the last draw after shutdown
-			prompt.FlushTo(screen)
-			screen.Show()
+			screen.WithScreen(func(screen tcell.SimulationScreen) {
+				prompt.FlushTo(screen)
+				screen.Show()
+			})
 
 			Expect(screen).Should(DisplayLike(50, 10,
 				">                                                 "+
@@ -402,8 +430,8 @@ var _ = Describe("The Prompt widget", func() {
 				"count: 1                                          "+
 				"> monterey jack                                   "+
 				"count: 2                                          "+
-				"> parmesean                                       ",
-				// normally, the main loop handles the last draw, so skip the final output
+				"> parmesean                                       "+
+				"count: 3                                          ",
 			))
 		})
 	})
