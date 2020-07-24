@@ -105,7 +105,7 @@ func (m *cellsMatcher) NegatedFailureMessage(actual interface{}) string {
 	case tcell.SimulationScreen:
 		actualScreen = actual
 	default:
-		return format.Message(actual, "to equal", displayCells(m.expected))
+		return format.Message(actual, "not to equal", displayCells(m.expected))
 	}
 	
 	if m.contentsOnly {
@@ -115,6 +115,9 @@ func (m *cellsMatcher) NegatedFailureMessage(actual interface{}) string {
 	}
 }
 
+// displayCells displays the given cells w/o formatting as they'd be displayed
+// on the screen (e.g. wrapped to width, etc).  Does not currently take into
+// account character width (largely relevant for full-width vs half-width CJK)
 func displayCells(screen tcell.SimulationScreen) string {
 	cells, _, _ := screen.GetContents()
 	screenCols, _ := screen.Size()
@@ -133,8 +136,8 @@ func displayCells(screen tcell.SimulationScreen) string {
 }
 
 // DisplayLike matches the given string to the contents to the actual screen,
-// ignoring styling.  It doesn't handle multi-rune sequences properly in the
-// expected string currently.
+// ignoring styling.  It doesn't handle multi-rune or large-width sequences
+// properly in the expected string currently.
 func DisplayLike(width, height int, text string) types.GomegaMatcher {
 	expected := tcell.NewSimulationScreen("")
 	expected.Init()
@@ -195,6 +198,27 @@ func DisplayWithStyle(width, height int, pairs ...interface{}) types.GomegaMatch
 			}
 			expected.SetContent(col, row, rn, nil, span.sty)
 		}
+	}
+
+	expected.Show()
+
+	return &cellsMatcher{expected: expected}
+}
+
+func DisplayWithCells(width, height int, cells ...tcell.SimCell) types.GomegaMatcher {
+	expected := tcell.NewSimulationScreen("")
+	expected.Init()
+	expected.SetSize(width, height)
+
+	row := -1
+	col := -1
+	for _, cell := range cells {
+		col++
+		if col % width == 0 {
+			row++
+			col = 0
+		}
+		expected.SetContent(col, row, cell.Runes[0], cell.Runes[1:], cell.Style)
 	}
 
 	expected.Show()

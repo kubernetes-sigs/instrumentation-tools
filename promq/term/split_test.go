@@ -19,9 +19,19 @@ package term_test
 import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/gdamore/tcell"
 
     "sigs.k8s.io/instrumentation-tools/promq/term"
 )
+
+type flushableTestView struct {
+	term.StaticResizable
+	FlushedTo tcell.Screen
+}
+
+func (v *flushableTestView) FlushTo(screen tcell.Screen) {
+	v.FlushedTo = screen
+}
 
 var _ = Describe("StaticResizable", func() {
 	It("should record the size it was sent", func() {
@@ -192,5 +202,20 @@ var _ = Describe("SplitView", func() {
 				Expect(dockedView.Cols).To(Equal(25))
 			})
 		})
+	})
+
+	It("should flush both parts of the split, if flushable, when asked to flush", func() {
+		dockedView := &flushableTestView{}
+		flexedView := &flushableTestView{}
+		view = term.SplitView{
+			Docked: dockedView,
+			Flexed: flexedView,
+		}
+
+		screen := tcell.NewSimulationScreen("")
+		view.FlushTo(screen)
+
+		Expect(dockedView.FlushedTo).To(BeIdenticalTo(screen))
+		Expect(flexedView.FlushedTo).To(BeIdenticalTo(screen))
 	})
 })

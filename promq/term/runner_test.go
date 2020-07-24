@@ -59,15 +59,18 @@ var _ = Describe("The overall Runner", func() {
 		keys chan *tcell.EventKey
 		done chan struct{}
 		runner *term.Runner
-		mainView *oneRuneView
+		mainView *oneRuneView = &oneRuneView{}
+		initialView term.View
 
 		// waitForLoopStart waits for the runner to start polling the screen, since
 		// tcell silently drops events until something is polling.
 	)
 	BeforeEach(func() {
-		mainView = &oneRuneView{}
-
 		screen = tcell.NewSimulationScreen("")
+		initialView = mainView
+	})
+	JustBeforeEach(func() {
+		*mainView = oneRuneView{}
 
 		keys = make(chan *tcell.EventKey, 10 /* some buffer to avoid blocking */)
 		runner = &term.Runner{
@@ -89,7 +92,7 @@ var _ = Describe("The overall Runner", func() {
 		go func() {
 			defer GinkgoRecover()
 			defer close(done)
-			Expect(runner.Run(ctx, mainView)).To(Succeed())
+			Expect(runner.Run(ctx, initialView)).To(Succeed())
 		}()
 
 		// NB(directxman12): events are discarded until we start polling for them,
@@ -140,8 +143,25 @@ var _ = Describe("The overall Runner", func() {
 		Eventually(screen).Should(DisplayLike(10, 10, "*"))
 	})
 
-	Context("when we get a window resize", func() {
+	Context("with no initial view", func() {
 		BeforeEach(func() {
+			initialView = nil
+		})
+
+		It("should skip repainting continue on", func() {
+			By("manually messing up the screen")
+			screen.SetContent(0, 0, 'x', nil, tcell.StyleDefault)
+			screen.Show()
+			Expect(screen).To(DisplayLike(10, 10, "x"))
+
+			By("requesting a repaint & checking the screen again")
+			runner.RequestRepaint()
+			Consistently(screen, "1s").Should(DisplayLike(10, 10, "x"))
+		})
+	})
+
+	Context("when we get a window resize", func() {
+		JustBeforeEach(func() {
 			// NB(directxman12): there's tiny bug in SimulationScreen that causes
 			// it to decide not send resize events when we call SetSize, so
 			// manually inject a resize event here.
@@ -159,18 +179,14 @@ var _ = Describe("The overall Runner", func() {
 	})
 
 	It("should show the cursor when asked to", func() {
-		Skip("this races somehow")
-
-		runner.ShowCursor(10, 12)
+		runner.ShowCursor(3, 4)
 		col, row, visible := screen.GetCursor()
 		Expect(visible).To(BeTrue())
-		Expect(col).To(Equal(10))
-		Expect(row).To(Equal(12))
+		Expect(col).To(Equal(3))
+		Expect(row).To(Equal(4))
 	})
 
 	It("should hide the cursor when asked to", func() {
-		Skip("this races somehow")
-
 		runner.HideCursor()
 		_, _, visible := screen.GetCursor()
 		Expect(visible).To(BeFalse())

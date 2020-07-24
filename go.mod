@@ -17,7 +17,7 @@ require (
 	github.com/gdamore/tcell v1.3.0
 	github.com/golang/protobuf v1.3.3
 	github.com/hokaccha/go-prettyjson v0.0.0-20190818114111-108c894c2c0e
-	github.com/mattn/go-runewidth v0.0.4
+	github.com/mattn/go-runewidth v0.0.9
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.7.0
 	github.com/pkg/term v0.0.0-20200520122047-c3ffed290a03 // indirect

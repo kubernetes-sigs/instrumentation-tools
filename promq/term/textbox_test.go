@@ -52,7 +52,7 @@ and why the sea is boiling hot
 			"    of cabbages, and kings,           "+
 			"and why the sea is boiling hot        "+
 			"    and whether pigs have wings.      "))
-		
+
 	})
 
 	PIt("should handle tabs properly, accounting for cursor movement properly", func() {
@@ -104,7 +104,7 @@ and why the sea is boiling hot
 		box.SetBox(term.PositionBox{Rows: 4, Cols: 4})
 		Expect(box).To(DisplayLike(6, 4, "but   not   on u  s!"))
 	})
-	
+
 	It("should skip rendering if given zero columns", func() {
 		box := &term.TextBox{}
 		box.WriteString("the oysters cried", tcell.StyleDefault)
@@ -139,11 +139,24 @@ and why the sea is boiling hot
 			"     after          "))
 	})
 
-	PIt("should handle multi-byte-single-rune contents", func() {
+	It("should handle multi-byte-single-rune contents", func() {
+		box := &term.TextBox{}
+		box.WriteString("warning sign: \u26a0 !!", tcell.StyleDefault)
 
+		box.SetBox(term.PositionBox{Rows: 1, Cols: 20})
+		Expect(box).To(DisplayLike(20, 1, "warning sign: \u26a0 !!"))
 	})
 
-	PIt("should handle combining characters and such", func() {
+	It("should handle combining characters and such", func() {
+		box := &term.TextBox{}
+		box.WriteString("b\u0301a !!", tcell.StyleDefault)
 
+		box.SetBox(term.PositionBox{Rows: 1, Cols: 20})
+		Expect(box).To(DisplayWithCells(20, 1,
+			tcell.SimCell{Runes: []rune{'b', '\u0301'}},
+			tcell.SimCell{Runes: []rune{'a'}},
+			tcell.SimCell{Runes: []rune{' '}},
+			tcell.SimCell{Runes: []rune{'!'}},
+			tcell.SimCell{Runes: []rune{'!'}}))
 	})
 })

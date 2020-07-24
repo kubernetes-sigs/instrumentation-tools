@@ -46,8 +46,10 @@ func (s *fakeScreenish) RequestRepaint() {
 	s.screen.Show()
 }
 
-// sendASCIIKeys sends strings with keypresses in the ascii range
-func sendASCIIKeys(str string, pr *term.PromptView) {
+// sendRuneKeys sends strings with keypresses that consist of single-rune
+// sequences (e.g. no control characters, non-rune keys, combining characters,
+// etc).
+func sendRuneKeys(str string, pr *term.PromptView) {
 	for _, rn := range str {
 		pr.HandleKey(tcell.NewEventKey(tcell.KeyRune, rn, tcell.ModNone))
 	}
@@ -104,80 +106,118 @@ var _ = Describe("The Prompt widget", func() {
 		cancel()
 	})
 
-	It("should translate key events into key presses on the screen", func() {
-		go func() {
-			defer GinkgoRecover()
-			Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
-		}()
+	Context("when translating key events into key presses", func() {
+		BeforeEach(func() {
+			go func() {
+				defer GinkgoRecover()
+				Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
+			}()
 
-		// wait for setup so that it's safe to send keypresses
-		<-waitForSetup
+			// wait for setup so that it's safe to send keypresses
+			<-waitForSetup
+		})
 
-		sendASCIIKeys("ch", prompt)
-		Eventually(screen).Should(DisplayLike(50, 10,
-			"> ch                                              "+
-			"     cheddar  only sharp cheddars allowed         ",
-		))
+		It("should map single-byte rune key presses to key presses in the prompt, and display them", func() {
 
-		sendASCIIKeys("edda", prompt)
-		Eventually(screen).Should(DisplayLike(50, 10,
-			"> chedda                                          "+
-			"         cheddar  only sharp cheddars allowed     ",
-		))
+			sendRuneKeys("ch", prompt)
+			Eventually(screen).Should(DisplayLike(50, 10,
+				"> ch                                              "+
+				"     cheddar  only sharp cheddars allowed         ",
+			))
 
-		sendASCIIKeys("\t", prompt)
-		Eventually(screen).Should(DisplayLike(50, 10,
-			"> cheddar                                         "+
-			"         cheddar  only sharp cheddars allowed     ",
-		))
+			sendRuneKeys("edda", prompt)
+			Eventually(screen).Should(DisplayLike(50, 10,
+				"> chedda                                          "+
+				"         cheddar  only sharp cheddars allowed     ",
+			))
 
-		sendASCIIKeys("\r", prompt)
-		Eventually(screen).Should(DisplayLike(50, 10,
-			"> cheddar                                         ",
-		))
+			sendRuneKeys("\t", prompt)
+			Eventually(screen).Should(DisplayLike(50, 10,
+				"> cheddar                                         "+
+				"         cheddar  only sharp cheddars allowed     ",
+			))
+
+			sendRuneKeys("\r", prompt)
+			Eventually(screen).Should(DisplayLike(50, 10,
+				"> cheddar                                         ",
+			))
+		})
+
+		It("should map multi-byte rune key presses to key presses in the prompt, and display them", func() {
+			sendRuneKeys("warning sign: \u26a0", prompt)
+			Eventually(screen).Should(DisplayLike(50, 10, "> warning sign: \u26a0"))
+		})
+
+		It("should map common non-rune key events to keypresses used to nativate completions", func() {
+			// TODO(directxman12): these should prob be separate tests
+
+			By("opening the completions menu with tab")
+			sendRuneKeys("\t", prompt)
+			Eventually(screen).Should(DisplayLike(50, 10,
+				">                                                 "+
+				"   cheddar      only sharp cheddars allowed       "+
+				"   parmesan     you'd better not mention the ...  "+
+				"   pepper jack  mmm... spicy                      ",
+			))
+
+			By("selecting a completion with down arrow & completing it with tab")
+			prompt.HandleKey(tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone))
+			Eventually(screen).Should(DisplayLike(50, 10,
+				">                                                 "+
+				"   cheddar      only sharp cheddars allowed       "+
+				"   parmesan     you'd better not mention the ...  "+
+				"   pepper jack  mmm... spicy                      ",
+			))
+
+			sendRuneKeys("\t", prompt)
+			Eventually(screen).Should(DisplayLike(50, 10,
+				"> cheddar                                         "+
+				"   cheddar      only sharp cheddars allowed       "+
+				"   parmesan     you'd better not mention the ...  "+
+				"   pepper jack  mmm... spicy                      ",
+			))
+
+			By("selecting a different completion with down arrow")
+			prompt.HandleKey(tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone))
+			Eventually(screen).Should(DisplayLike(50, 10,
+				"> parmesan                                        "+
+				"   cheddar      only sharp cheddars allowed       "+
+				"   parmesan     you'd better not mention the ...  "+
+				"   pepper jack  mmm... spicy                      ",
+			))
+
+			By("going back with up arrow")
+			prompt.HandleKey(tcell.NewEventKey(tcell.KeyUp, 0, tcell.ModNone))
+			Eventually(screen).Should(DisplayLike(50, 10,
+				"> cheddar                                         "+
+				"   cheddar      only sharp cheddars allowed       "+
+				"   parmesan     you'd better not mention the ...  "+
+				"   pepper jack  mmm... spicy                      ",
+			))
+
+			By("navigating left with left arrow")
+			prompt.HandleKey(tcell.NewEventKey(tcell.KeyLeft, 0, tcell.ModNone))
+			prompt.HandleKey(tcell.NewEventKey(tcell.KeyLeft, 0, tcell.ModNone))
+			sendRuneKeys(" ", prompt)
+			Eventually(screen).Should(DisplayLike(50, 10,
+				"> chedd ar                                        "+
+				"   cheddar      only sharp cheddars allowed       "+
+				"   parmesan     you'd better not mention the ...  "+
+				"   pepper jack  mmm... spicy                      ",
+			))
+
+			By("navigating right with right arrow")
+			prompt.HandleKey(tcell.NewEventKey(tcell.KeyRight, 0, tcell.ModNone))
+			sendRuneKeys(" ", prompt)
+			Eventually(screen).Should(DisplayLike(50, 10,
+				"> chedd a r                                       "+
+				"   cheddar      only sharp cheddars allowed       "+
+				"   parmesan     you'd better not mention the ...  "+
+				"   pepper jack  mmm... spicy                      ",
+			))
+		})
 	})
 
-	It("should handle using non-displayable keys to navigate the completions", func() {
-		go func() {
-			defer GinkgoRecover()
-			Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
-		}()
-
-		// wait for setup so that it's safe to send keypresses
-		<-waitForSetup
-
-		sendASCIIKeys("\t", prompt)
-		Eventually(screen).Should(DisplayLike(50, 10,
-			">                                                 "+
-			"   cheddar      only sharp cheddars allowed       "+
-			"   parmesan     you'd better not mention the ...  "+
-			"   pepper jack  mmm... spicy                      ",
-		))
-
-		prompt.HandleKey(tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone))
-		Eventually(screen).Should(DisplayLike(50, 10,
-			">                                                 "+
-			"   cheddar      only sharp cheddars allowed       "+
-			"   parmesan     you'd better not mention the ...  "+
-			"   pepper jack  mmm... spicy                      ",
-		))
-
-		sendASCIIKeys("\t", prompt)
-		Eventually(screen).Should(DisplayLike(50, 10,
-			"> cheddar                                         "+
-			"   cheddar      only sharp cheddars allowed       "+
-			"   parmesan     you'd better not mention the ...  "+
-			"   pepper jack  mmm... spicy                      ",
-		))
-
-		prompt.HandleKey(tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModNone))
-		Eventually(screen).Should(DisplayLike(50, 10,
-			"> parmesan                                        "+
-			"   cheddar      only sharp cheddars allowed       "+
-			"   parmesan     you'd better not mention the ...  "+
-			"   pepper jack  mmm... spicy                      ",
-		))
-	})
 
 	It("should populate initial input into the prompt if given", func() {
 		initialInput := "pepper jack"
@@ -198,13 +238,57 @@ var _ = Describe("The Prompt widget", func() {
 		Eventually(doneCh).Should(BeClosed())
 	})
 
-	PContext("when rendering", func() {
+	Context("when rendering", func() {
 		It("should start rendering at its box's position", func() {
+			go func() {
+				defer GinkgoRecover()
+				Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
+			}()
 
+			// wait for setup so that it's safe to send keypresses
+			<-waitForSetup
+
+			prompt.SetBox(term.PositionBox{StartRow: 1, StartCol: 2, Rows: 7, Cols: 45})
+
+			Eventually(screen).Should(DisplayLike(50, 10,
+				"                                                  "+
+				"  >                                               ",
+			))
 		})
 
 		It("should never render outside its box", func() {
+			prompt.HandleInput = func(_ string) (*string, bool) {
+				// never exit normally, just use the cancel in aftereach
+				return nil, false
+			}
+			go func() {
+				defer GinkgoRecover()
+				Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
+			}()
 
+			// wait for setup so that it's safe to send keypresses
+			<-waitForSetup
+
+			By("using a box smaller than the screen box & marking the end manually")
+			prompt.SetBox(term.PositionBox{Cols: 40, Rows: 7})
+			screen.SetContent(0, 7, '*', nil, tcell.StyleDefault)
+			screen.SetContent(45, 0, '*', nil, tcell.StyleDefault)
+
+			By("entering in a few lines of text, and checking that we scrolled")
+			sendRuneKeys("cheddar\r", prompt)
+			sendRuneKeys("pepper jack\r", prompt)
+			sendRuneKeys("monterey jack\r", prompt)
+			sendRuneKeys("wensleydale\r", prompt)
+			Eventually(screen).Should(DisplayLike(50, 10,
+				"> monterey jack                              *    "+
+				"> wensleydale                                     "+
+				">                                                 "+
+				"   cheddar      only sharp cheddars...            "+
+				"   parmesan     you'd better not me...            "+
+				"   pepper jack  mmm... spicy                      "+
+				"                                                  "+
+				"*                                                 ",
+			))
 		})
 	})
 
@@ -240,7 +324,7 @@ var _ = Describe("The Prompt widget", func() {
 			// wait for setup so that it's safe to send keypresses
 			<-waitForSetup
 
-			sendASCIIKeys("parmesean\r", prompt)
+			sendRuneKeys("parmesean\r", prompt)
 
 			Eventually(textCh).Should(Receive(Equal("parmesean")))
 		})
@@ -281,8 +365,8 @@ var _ = Describe("The Prompt widget", func() {
 			// wait for setup so that it's safe to send keypresses
 			<-waitForSetup
 
-			sendASCIIKeys("cheddar\r", prompt)
-			sendASCIIKeys("monterey jack\r", prompt)
+			sendRuneKeys("cheddar\r", prompt)
+			sendRuneKeys("monterey jack\r", prompt)
 
 			Eventually(screen).Should(DisplayLike(50, 10,
 				"> cheddar                                         "+
@@ -308,10 +392,10 @@ var _ = Describe("The Prompt widget", func() {
 			// wait for setup so that it's safe to send keypresses
 			<-waitForSetup
 
-			sendASCIIKeys("cheddar\r", prompt)
-			sendASCIIKeys("monterey jack\r", prompt)
-			sendASCIIKeys("parmesean\r", prompt)
-
+			sendRuneKeys("cheddar\r", prompt)
+			sendRuneKeys("monterey jack\r", prompt)
+			sendRuneKeys("parmesean\r", prompt)
+			sendRuneKeys("\r", prompt)
 
 			Eventually(screen).Should(DisplayLike(50, 10,
 				"> cheddar                                         "+
