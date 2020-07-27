@@ -53,6 +53,10 @@ var (
 	ScalarBinaryExpression = NewNonTerminal("scalar-binary-expression", false)
 	VectorBinaryExpression = NewNonTerminal("vector-binary-expression", false)
 
+	// Binary expressions related non-terminals:
+	BinaryOperator      = NewNonTerminal("scalar-binary-operator", false)
+	BinaryGroupModifier = NewNonTerminal("binary-group-modifier", false)
+
 	// terminals
 	Identifier               = NewTerminal(ID)                                  // this one is ambiguous
 	MetricIdentifier         = NewTerminalWithSubType(ID, METRIC_ID)            // this one is ambiguous
@@ -64,10 +68,12 @@ var (
 	AggregateKeyword = NewTerminal(AGGR_KW)
 	BoolKeyword      = NewTerminalWithSubType(KEYWORD, BOOL_KW)
 	OffsetKeyword    = NewTerminalWithSubType(KEYWORD, OFFSET_KW)
+	GroupKeyword     = NewTerminal(GROUP_KW)
+	GroupSide        = NewTerminal(GROUP_SIDE)
 
 	Operator           = NewTerminal(OPERATOR)
 	Arithmetic         = NewTerminal(ARITHMETIC)
-	Logical            = NewTerminal(LOGICAL)
+	SetOperator        = NewTerminal(SET)
 	LabelMatchOperator = NewTerminalWithSubType(OPERATOR, LABELMATCH)
 	Comparision        = NewTerminalWithSubType(OPERATOR, COMPARISION)
 
@@ -154,6 +160,9 @@ var (
 		NewRule(LabelsExpression, LParen, MetricLabelArgs, RParen),
 		// label list could be empty
 		NewRule(LabelsExpression, LParen, RParen),
+		// label list can end with comma
+		NewRule(LabelsExpression, LParen, MetricLabelArgs, Comma, RParen),
+
 		// todo(han) it is also valid to have multiple targeted additional metric label
 		// todo(han) i.e. sum(metricname{label1="blah",label2="else"}) by (label3)
 		NewRule(MetricLabelArgs, MetricLabelArgs, Comma, MetricLabelIdentifier),
@@ -172,18 +181,26 @@ var (
 		// 2) vector type binary expr
 		NewRule(BinaryExpression, VectorBinaryExpression),
 
-		// Todo(yuchen): some function call will also return scalar type expression(e.g. time(), scalar())
+		// Binary Operators:
+		NewRule(BinaryOperator, Arithmetic),
+		NewRule(BinaryOperator, Comparision),
+		NewRule(BinaryOperator, Comparision, BoolKeyword),
+
+		// Binary group modifiers:
+		NewRule(BinaryGroupModifier, GroupKeyword, LabelsExpression),
+		NewRule(BinaryGroupModifier, GroupKeyword, LabelsExpression, GroupSide),
+		NewRule(BinaryGroupModifier, GroupKeyword, LabelsExpression, GroupSide, LabelsExpression),
+
 		NewRule(ScalarBinaryExpression, ScalarTypeExpression, Arithmetic, ScalarTypeExpression),
 		NewRule(ScalarBinaryExpression, ScalarTypeExpression, Comparision, BoolKeyword, ScalarTypeExpression),
-		//NewRule(ScalarBinaryExpression, ScalarBinaryExpression, Arithmetic, Num),
-		//NewRule(ScalarBinaryExpression, ScalarBinaryExpression, Comparision, BoolKeyword, Num),
 
-		NewRule(VectorBinaryExpression, ScalarTypeExpression, Arithmetic, VectorTypeExpression),
-		NewRule(VectorBinaryExpression, ScalarTypeExpression, Comparision, BoolKeyword, VectorTypeExpression),
-		NewRule(VectorBinaryExpression, VectorTypeExpression, Arithmetic, ScalarTypeExpression),
-		NewRule(VectorBinaryExpression, VectorTypeExpression, Comparision, BoolKeyword, ScalarTypeExpression),
-		NewRule(VectorBinaryExpression, VectorTypeExpression, Arithmetic, VectorTypeExpression),
-		NewRule(VectorBinaryExpression, VectorTypeExpression, Comparision, BoolKeyword, VectorTypeExpression),
+		NewRule(VectorBinaryExpression, ScalarTypeExpression, BinaryOperator, VectorTypeExpression),
+		NewRule(VectorBinaryExpression, VectorTypeExpression, BinaryOperator, ScalarTypeExpression),
+		NewRule(VectorBinaryExpression, VectorTypeExpression, BinaryOperator, VectorTypeExpression),
+		NewRule(VectorBinaryExpression, VectorTypeExpression, SetOperator, VectorTypeExpression),
+		NewRule(VectorBinaryExpression, VectorTypeExpression, BinaryOperator, BinaryGroupModifier, VectorTypeExpression),
+		// Set operations match with all possible entries in the right vector by default.
+		NewRule(VectorBinaryExpression, VectorTypeExpression, SetOperator, GroupKeyword, LabelsExpression, VectorTypeExpression),
 
 		// FUNCTION EXPRESSIONS:
 		// Todo(yuchen) The input args can vary from different functions. Here I only separate the function with different return type.
@@ -227,10 +244,19 @@ var (
 		"by":      "",
 		"without": "",
 	}
-
 	keywords = map[string]string{
 		"bool":   "",
 		"offset": "",
+	}
+
+	groupKeywords = map[string]string{
+		"ignoring": "",
+		"on":       "",
+	}
+
+	groupSideKeywords = map[string]string{
+		"group_left":  "",
+		"group_right": "",
 	}
 
 	arithmaticOperators = map[string]string{
@@ -249,7 +275,7 @@ var (
 		"<=": "less or equal",
 	}
 
-	logicalOperators = map[string]string{
+	setOperators = map[string]string{
 		"and":    "intersection",
 		"or":     "union",
 		"unless": "complement",

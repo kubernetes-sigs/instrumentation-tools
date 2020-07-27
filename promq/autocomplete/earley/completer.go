@@ -142,9 +142,9 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 				newMatch := NewPartialMatch(ao, "comparision", comparisionOperators[ao])
 				matches = append(matches, newMatch)
 			}
-		case LOGICAL:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(logicalOperators), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "logical", logicalOperators[ao])
+		case SET:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(setOperators), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "logical", setOperators[ao])
 				matches = append(matches, newMatch)
 			}
 		case LABELMATCH:
@@ -156,6 +156,16 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 			matches = append(matches, NewPartialMatch("offset", "keyword", keywords["offset"]))
 		case BOOL_KW:
 			matches = append(matches, NewPartialMatch("bool", "keyword", keywords["bool"]))
+		case GROUP_SIDE:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(groupSideKeywords), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "keyword", groupSideKeywords[ao])
+				matches = append(matches, newMatch)
+			}
+		case GROUP_KW:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(groupKeywords), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "keyword", groupKeywords[ao])
+				matches = append(matches, newMatch)
+			}
 		case DURATION:
 			// add time units to match is the prefix is number
 			if _, err := strconv.Atoi(autocompletePrefix); err == nil {

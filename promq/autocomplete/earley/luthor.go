@@ -100,17 +100,19 @@ const (
 	//binary operators
 	ARITHMETIC  TokenType = "arithmetic"
 	COMPARISION TokenType = "comparision"
-	LOGICAL     TokenType = "logical"
+	SET         TokenType = "set"
 	//label match operator
 	LABELMATCH TokenType = "label-match"
 
 	AGGR_OP TokenType = "aggregator_operation"
 
 	//keywords
-	KEYWORD   TokenType = "keyword"
-	AGGR_KW   TokenType = "aggregator_keyword"
-	BOOL_KW   TokenType = "bool-keyword"
-	OFFSET_KW TokenType = "offset-keyword"
+	KEYWORD    TokenType = "keyword"
+	AGGR_KW    TokenType = "aggregator_keyword"
+	BOOL_KW    TokenType = "bool-keyword"
+	OFFSET_KW  TokenType = "offset-keyword"
+	GROUP_SIDE TokenType = "group-side"
+	GROUP_KW   TokenType = "group-keyword"
 
 	LEFT_BRACE    TokenType = "leftbrace"
 	RIGHT_BRACE   TokenType = "rightbrace"
@@ -210,8 +212,16 @@ func createTokenFromItem(item promql.Item, offset int) Tokhan {
 func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 	t := item.Typ
 	switch {
-	case item.Val == "by", item.Val == "without":
+	case t == promql.BY, t == promql.WITHOUT:
 		return AGGR_KW
+	case t == promql.OFFSET:
+		return OFFSET_KW
+	case t == promql.BOOL:
+		return BOOL_KW
+	case t == promql.GROUP_LEFT, t == promql.GROUP_RIGHT:
+		return GROUP_SIDE
+	case t == promql.IGNORING, t == promql.ON:
+		return GROUP_KW
 	case t == promql.EOF:
 		return EOF
 	case t == promql.STRING:
@@ -234,20 +244,16 @@ func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 		return LEFT_PAREN
 	case t == promql.RIGHT_PAREN:
 		return RIGHT_PAREN
-	case t == promql.BOOL:
-		return BOOL_KW
 	case t == promql.LEFT_BRACKET:
 		return LEFT_BRACKET
 	case t == promql.RIGHT_BRACKET:
 		return RIGHT_BRACKET
-	case t == promql.OFFSET:
-		return OFFSET_KW
 	case t == promql.DURATION:
 		return DURATION
 	case t == promql.ADD, t == promql.SUB, t == promql.MUL, t == promql.DIV:
 		return ARITHMETIC
 	case t == promql.LAND, t == promql.LOR, t == promql.LUNLESS:
-		return LOGICAL
+		return SET
 	case isOperator(t):
 		return OPERATOR
 	case t == promql.COMMA:
