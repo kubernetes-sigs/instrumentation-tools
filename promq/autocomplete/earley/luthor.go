@@ -85,10 +85,6 @@ type TypedToken interface {
 
 type TokenType string
 
-func (t TokenType) IsKeyword() bool {
-	return t == AGGR_KW || t == BOOL_KW || t == OFFSET_KW
-}
-
 const (
 	ID                   TokenType = "identifier"
 	METRIC_ID            TokenType = "metric-identifier"
@@ -103,6 +99,8 @@ const (
 	SET         TokenType = "set"
 	//label match operator
 	LABELMATCH TokenType = "label-match"
+	// unary operators
+	UNARY_OP TokenType = "unary-op"
 
 	AGGR_OP TokenType = "aggregator_operation"
 
@@ -250,7 +248,7 @@ func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 		return RIGHT_BRACKET
 	case t == promql.DURATION:
 		return DURATION
-	case t == promql.ADD, t == promql.SUB, t == promql.MUL, t == promql.DIV:
+	case t == promql.ADD, t == promql.SUB, t == promql.MUL, t == promql.DIV, t == promql.MOD, t == promql.POW:
 		return ARITHMETIC
 	case t == promql.LAND, t == promql.LOR, t == promql.LUNLESS:
 		return SET

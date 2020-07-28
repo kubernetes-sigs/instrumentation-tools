@@ -133,8 +133,8 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 				matches = append(matches, newMatch)
 			}
 		case ARITHMETIC:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(arithmaticOperators), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "arithmetic", arithmaticOperators[ao])
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(arithmeticOperators), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "arithmetic", arithmeticOperators[ao])
 				matches = append(matches, newMatch)
 			}
 		case COMPARISION:
@@ -150,6 +150,11 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 		case LABELMATCH:
 			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(labelMatchOperators), autocompletePrefix, false).List() {
 				newMatch := NewPartialMatch(ao, "label-match", labelMatchOperators[ao])
+				matches = append(matches, newMatch)
+			}
+		case UNARY_OP:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(unaryOperators), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "unary", unaryOperators[ao])
 				matches = append(matches, newMatch)
 			}
 		case OFFSET_KW:

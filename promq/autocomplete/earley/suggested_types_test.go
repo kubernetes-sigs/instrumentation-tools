@@ -90,13 +90,13 @@ func TestSuggestedTypes(t *testing.T) {
 			name:              "If we've consumed zero tokens, then we should suggest",
 			inputString:       "blah",
 			tokenPosList:      []int{0},
-			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN}},
+			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP}},
 		},
 		{
 			name:              "If we have an empty string, then we should suggest",
 			inputString:       "",
 			tokenPosList:      []int{0},
-			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN}},
+			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP}},
 		},
 		{
 			name:         "Binary Expression - scalar binary with arithmetic operation",
@@ -105,6 +105,18 @@ func TestSuggestedTypes(t *testing.T) {
 			expectedTypesList: [][]TokenType{
 				{ARITHMETIC, COMPARISION, EOF},
 				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				{EOF, ARITHMETIC, COMPARISION},
+			},
+		},
+		{
+			name:         "Binary Expression - with unary expression",
+			inputString:  "123 + (-4)",
+			tokenPosList: []int{2, 3, 4, 5, 6},
+			expectedTypesList: [][]TokenType{
+				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				{UNARY_OP, NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				{RIGHT_PAREN, COMPARISION, ARITHMETIC},
 				{EOF, ARITHMETIC, COMPARISION},
 			},
 		},
@@ -166,7 +178,7 @@ func TestSuggestedTypes(t *testing.T) {
 			expectedTypesList: [][]TokenType{
 				{GROUP_SIDE, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
 				{LEFT_PAREN, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP},
-				{METRIC_LABEL_SUBTYPE, RIGHT_PAREN, NUM, METRIC_ID, LEFT_PAREN, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP},
+				{METRIC_LABEL_SUBTYPE, RIGHT_PAREN, NUM, METRIC_ID, LEFT_PAREN, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, UNARY_OP},
 				{COMMA, RIGHT_PAREN, OFFSET_KW, LEFT_PAREN, COMPARISION, ARITHMETIC, LEFT_BRACE, SET},
 				{METRIC_LABEL_SUBTYPE, RIGHT_PAREN},
 				{NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
@@ -293,10 +305,11 @@ func TestSuggestedTypes(t *testing.T) {
 		},
 		{
 			name:         "Function expression - have multiple args",
-			inputString:  "round(metricname, 5)",
-			tokenPosList: []int{3, 4, 5},
+			inputString:  "round(metricname, -5)",
+			tokenPosList: []int{3, 4, 5, 6},
 			expectedTypesList: [][]TokenType{
 				{RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, LEFT_PAREN, LEFT_BRACE, COMPARISION, ARITHMETIC, SET},
+				{METRIC_ID, NUM, AGGR_OP, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, LEFT_PAREN, UNARY_OP},
 				{METRIC_ID, NUM, AGGR_OP, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, LEFT_PAREN},
 				{RIGHT_PAREN, COMMA, COMPARISION, ARITHMETIC},
 			},
@@ -307,7 +320,7 @@ func TestSuggestedTypes(t *testing.T) {
 			tokenPosList: []int{3, 4, 10, 11},
 			expectedTypesList: [][]TokenType{
 				{LEFT_PAREN},
-				{RIGHT_PAREN, METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				{RIGHT_PAREN, METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
 				{RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
 				{RIGHT_PAREN, COMMA, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
 			},
@@ -344,7 +357,7 @@ func TestSuggestedTypes(t *testing.T) {
 			tokenPosList: []int{4, 5, 6, 7, 8, 9},
 			expectedTypesList: [][]TokenType{
 				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
 				{COMPARISION, ARITHMETIC},
 				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
 				{RIGHT_PAREN, ARITHMETIC, COMPARISION},
@@ -371,14 +384,38 @@ func TestSuggestedTypes(t *testing.T) {
 			inputString:  "((foo + bar{nm='val'}) + metric_name) + 1",
 			tokenPosList: []int{0, 1, 11, 12, 13, 14, 15, 16},
 			expectedTypesList: [][]TokenType{
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
+				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
 				{RIGHT_PAREN, SET, ARITHMETIC, COMPARISION},
 				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, GROUP_KW},
 				{OFFSET_KW, LEFT_BRACE, LEFT_PAREN, COMPARISION, SET, ARITHMETIC, RIGHT_PAREN},
 				{EOF, LEFT_BRACKET, COMPARISION, SET, ARITHMETIC},
 				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, GROUP_KW},
 				{EOF, COMPARISION, SET, ARITHMETIC, LEFT_BRACKET},
+			},
+		},
+		{
+			name:         "Unary expression - number",
+			inputString:  "-1 + 2 * 5",
+			tokenPosList: []int{0, 1, 2, 3, 4, 5, 6},
+			expectedTypesList: [][]TokenType{
+				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
+				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				{EOF, ARITHMETIC, COMPARISION},
+				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				{ARITHMETIC, COMPARISION, EOF},
+				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				{ARITHMETIC, COMPARISION, EOF},
+			},
+		},
+		{
+			name:         "Unary expression - metrics",
+			inputString:  "-foo",
+			tokenPosList: []int{0, 1, 2},
+			expectedTypesList: [][]TokenType{
+				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
+				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				{EOF, ARITHMETIC, COMPARISION, SET, LEFT_PAREN, LEFT_BRACE, OFFSET_KW},
 			},
 		},
 	}
@@ -418,7 +455,7 @@ func TestPartialParse(t *testing.T) {
 			"new input is empty",
 			"sum(metric_name_one",
 			"",
-			[]TokenType{METRIC_ID, NUM, AGGR_OP, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, LEFT_PAREN},
+			[]TokenType{METRIC_ID, NUM, AGGR_OP, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, LEFT_PAREN, UNARY_OP},
 		},
 		{
 			"previous input is empty",

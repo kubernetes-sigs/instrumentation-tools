@@ -20,21 +20,26 @@ type terminalType string
 
 var (
 	// non-terminals
-	Root               = NewNonTerminal("root", true)
-	Expression         = NewNonTerminal("expression", false)
-	MetricExpression   = NewNonTerminal("metric-expression", false)
-	AggrExpression     = NewNonTerminal("aggr-expression", false)
-	BinaryExpression   = NewNonTerminal("binary-expression", false)
-	FuncExpression     = NewNonTerminal("function-expression", false)
-	SubqueryExpression = NewNonTerminal("subquery-expression", false)
-	NumLiteral         = NewNonTerminal("num-literal", false)
-	StrLiteral         = NewNonTerminal("str-literal", false)
+	Root = NewNonTerminal("root", true)
 
+	Expression         = NewNonTerminal("expression", false)
+	AggrExpression     = NewNonTerminal("aggr-expression", false)
+	SubqueryExpression = NewNonTerminal("subquery-expression", false)
+	UnaryExpression    = NewNonTerminal("unary-expression", false)
+	// bianry expressions
+	ScalarBinaryExpression = NewNonTerminal("scalar-binary-expression", false)
+	VectorBinaryExpression = NewNonTerminal("vector-binary-expression", false)
+	// function expression
 	VectorFuncExpression = NewNonTerminal("vector-function-expression", false)
 	ScalarFuncExpression = NewNonTerminal("scalar-function-expression", false)
-
+	// metrics expression
 	MatrixSelector = NewNonTerminal("matrix-selector", false)
 	VectorSelector = NewNonTerminal("vector-selector", false)
+
+	// Expression types
+	ScalarTypeExpression = NewNonTerminal("scalar-type-expression", false)
+	VectorTypeExpression = NewNonTerminal("vector-type-expression", false)
+	MatrixTypeExpression = NewNonTerminal("matrix-type-expression", false)
 
 	LabelsExpression      = NewNonTerminal("labels-expression", false)
 	LabelsMatchExpression = NewNonTerminal("labels-match-expression", false)
@@ -42,18 +47,11 @@ var (
 	AggrCallExpression    = NewNonTerminal("aggr-call-expression", false)
 	MetricLabelArgs       = NewNonTerminal("label-args", false)
 
-	OffsetExpression = NewNonTerminal("offset-expression", false)
+	OffsetModifier = NewNonTerminal("offset-modifier", false)
 	//AggrFuncParam   = NewNonTerminal("func-param", false) // sometimes optional, but sometimes necessary
 
 	FunctionCallBody = NewNonTerminal("function-call-body", false)
 	FunctionCallArgs = NewNonTerminal("function-call-args", false)
-
-	// Expression types:
-	ScalarTypeExpression   = NewNonTerminal("scalar-type-expression", false)
-	VectorTypeExpression   = NewNonTerminal("vector-type-expression", false)
-	MatrixTypeExpression   = NewNonTerminal("matrix-type-expression", false)
-	ScalarBinaryExpression = NewNonTerminal("scalar-binary-expression", false)
-	VectorBinaryExpression = NewNonTerminal("vector-binary-expression", false)
 
 	// Binary expressions related non-terminals:
 	BinaryOperator      = NewNonTerminal("scalar-binary-operator", false)
@@ -75,6 +73,7 @@ var (
 
 	Operator           = NewTerminal(OPERATOR)
 	Arithmetic         = NewTerminal(ARITHMETIC)
+	UnaryOperator      = NewTerminalWithSubType(ARITHMETIC, UNARY_OP)
 	SetOperator        = NewTerminal(SET)
 	LabelMatchOperator = NewTerminalWithSubType(OPERATOR, LABELMATCH)
 	Comparision        = NewTerminalWithSubType(OPERATOR, COMPARISION)
@@ -101,6 +100,7 @@ var (
 		NewRule(Expression, ScalarTypeExpression),
 		NewRule(Expression, VectorTypeExpression),
 		NewRule(Expression, MatrixTypeExpression),
+		NewRule(Expression, UnaryExpression),
 
 		// EXPRESSION TYPE:
 		// 1) scalar type expression
@@ -117,30 +117,25 @@ var (
 		NewRule(MatrixTypeExpression, SubqueryExpression),
 
 		// METRIC EXPRESSIONS:
-		// 1) Instant vector selectors
-		NewRule(MetricExpression, VectorSelector),
-		// 2) Range Vector Selectors
-		NewRule(MetricExpression, MatrixSelector),
-
-		// VECTOR SELECTOR
+		// vector selector: instant vector selectors
 		// 1) a vector selector can consist solely of a metric tokenType
 		NewRule(VectorSelector, MetricIdentifier),
 		// 2) a vector selector can optionally have a label expression
 		NewRule(VectorSelector, MetricIdentifier, LabelsMatchExpression),
 		// 3) a metric expression can optionally have offset to get historical data
-		NewRule(VectorSelector, MetricIdentifier, OffsetExpression),
-		NewRule(VectorSelector, MetricIdentifier, LabelsMatchExpression, OffsetExpression),
+		NewRule(VectorSelector, MetricIdentifier, OffsetModifier),
+		NewRule(VectorSelector, MetricIdentifier, LabelsMatchExpression, OffsetModifier),
 
-		// MATRIX SELECTOR
+		// matrix selector: range Vector selectors
 		// metric[5m]
 		NewRule(MatrixSelector, MetricIdentifier, LBracket, Duration, RBracket),
 		NewRule(MatrixSelector, MetricIdentifier, LabelsMatchExpression, LBracket, Duration, RBracket),
 		// metric[5m] offset 3h
-		NewRule(MatrixSelector, MetricIdentifier, LBracket, Duration, RBracket, OffsetExpression),
-		NewRule(MatrixSelector, MetricIdentifier, LabelsMatchExpression, LBracket, Duration, RBracket, OffsetExpression),
+		NewRule(MatrixSelector, MetricIdentifier, LBracket, Duration, RBracket, OffsetModifier),
+		NewRule(MatrixSelector, MetricIdentifier, LabelsMatchExpression, LBracket, Duration, RBracket, OffsetModifier),
 
-		// UNARY EXPRESSIONS:
-		NewRule(OffsetExpression, OffsetKeyword, Duration),
+		// offset modifier:
+		NewRule(OffsetModifier, OffsetKeyword, Duration),
 
 		// AGGR EXPRESSIONS:
 		// 1) a aggregation operation expression can consist solely of a metric tokenType
@@ -173,14 +168,6 @@ var (
 		NewRule(LabelValueExpression, LabelValueExpression, Comma, MetricLabelIdentifier, LabelMatchOperator, Str),
 
 		// BINARY EXPRESSIONS:
-		// 1) scalar type binary expr: both left and right are scalar type
-		NewRule(BinaryExpression, ScalarBinaryExpression),
-		// 2) vector type binary expr
-		NewRule(BinaryExpression, VectorBinaryExpression),
-		// binary expression can be embraced by parenthesis
-		NewRule(ScalarBinaryExpression, LParen, ScalarBinaryExpression, RParen),
-		NewRule(VectorBinaryExpression, LParen, VectorBinaryExpression, RParen),
-
 		// Binary Operators:
 		NewRule(BinaryOperator, Arithmetic),
 		NewRule(BinaryOperator, Comparision),
@@ -191,9 +178,10 @@ var (
 		NewRule(BinaryGroupModifier, GroupKeyword, LabelsExpression, GroupSide),
 		NewRule(BinaryGroupModifier, GroupKeyword, LabelsExpression, GroupSide, LabelsExpression),
 
+		// 1) scalar type binary expr: both left and right are scalar type
 		NewRule(ScalarBinaryExpression, ScalarTypeExpression, Arithmetic, ScalarTypeExpression),
 		NewRule(ScalarBinaryExpression, ScalarTypeExpression, Comparision, BoolKeyword, ScalarTypeExpression),
-
+		//2) vector type binary expr
 		NewRule(VectorBinaryExpression, ScalarTypeExpression, BinaryOperator, VectorTypeExpression),
 		NewRule(VectorBinaryExpression, VectorTypeExpression, BinaryOperator, ScalarTypeExpression),
 		NewRule(VectorBinaryExpression, VectorTypeExpression, BinaryOperator, VectorTypeExpression),
@@ -202,11 +190,15 @@ var (
 		// Set operations match with all possible entries in the right vector by default.
 		NewRule(VectorBinaryExpression, VectorTypeExpression, SetOperator, GroupKeyword, LabelsExpression, VectorTypeExpression),
 
+		// binary expression can be embraced by parenthesis
+		NewRule(ScalarBinaryExpression, LParen, ScalarBinaryExpression, RParen),
+		NewRule(VectorBinaryExpression, LParen, VectorBinaryExpression, RParen),
+		// unary exprssion inside binary expression should embraced with parenthesis
+		NewRule(ScalarBinaryExpression, LParen, UnaryOperator, ScalarTypeExpression, RParen),
+		NewRule(VectorBinaryExpression, LParen, UnaryOperator, VectorTypeExpression, RParen),
+
 		// FUNCTION EXPRESSIONS:
 		// Todo(yuchen) The input args can vary from different functions. Here I only separate the function with different return type.
-		NewRule(FuncExpression, ScalarFuncExpression),
-		NewRule(FuncExpression, VectorTypeExpression),
-
 		// the functions that return vector type expression
 		NewRule(VectorFuncExpression, VectorFunctionIdentifier, FunctionCallBody),
 		NewRule(FunctionCallBody, LParen, RParen),
@@ -220,8 +212,12 @@ var (
 		// SUBQUERY EXPRESSIONS:
 		NewRule(SubqueryExpression, VectorTypeExpression, LBracket, Duration, Colon, RBracket),
 		NewRule(SubqueryExpression, VectorTypeExpression, LBracket, Duration, Colon, Duration, RBracket),
-		NewRule(SubqueryExpression, VectorTypeExpression, LBracket, Duration, Colon, RBracket, OffsetExpression),
-		NewRule(SubqueryExpression, VectorTypeExpression, LBracket, Duration, Colon, Duration, RBracket, OffsetExpression),
+		NewRule(SubqueryExpression, VectorTypeExpression, LBracket, Duration, Colon, RBracket, OffsetModifier),
+		NewRule(SubqueryExpression, VectorTypeExpression, LBracket, Duration, Colon, Duration, RBracket, OffsetModifier),
+
+		//UNARY EXPRESSIONS:
+		NewRule(UnaryExpression, UnaryOperator, ScalarTypeExpression),
+		NewRule(UnaryExpression, UnaryOperator, VectorTypeExpression),
 	)
 
 	PromQLParser = NewEarleyParser(*promQLGrammar)
@@ -242,29 +238,36 @@ var (
 
 	// Todo:(yuchen) add the description for keywords
 	aggregateKeywords = map[string]string{
-		"by":      "",
-		"without": "",
+		"by":      "keep the listed labels and drop the labels that are not listed in the clause",
+		"without": "remove the listed labels from the result vector",
 	}
 	keywords = map[string]string{
-		"bool":   "",
-		"offset": "",
+		"bool":   "if provided, return 0 or 1 for the value rather than filtering",
+		"offset": "allow changing the time offset for individual instant and range vectors in a query",
 	}
 
 	groupKeywords = map[string]string{
-		"ignoring": "",
-		"on":       "",
+		"ignoring": "ignore certain labels when matching",
+		"on":       "match on provided label list",
 	}
 
 	groupSideKeywords = map[string]string{
-		"group_left":  "",
-		"group_right": "",
+		"group_left":  "left vector has higher cardinality",
+		"group_right": "right vector has higher cardinality",
 	}
 
-	arithmaticOperators = map[string]string{
-		"+": "",
-		"-": "",
-		"*": "",
-		"/": "",
+	arithmeticOperators = map[string]string{
+		"+": "addition",
+		"-": "subtraction",
+		"*": "multiplication",
+		"/": "division",
+		"%": "modulo",
+		"^": "power/exponentiation",
+	}
+
+	unaryOperators = map[string]string{
+		"+": "positive",
+		"-": "negative",
 	}
 
 	comparisionOperators = map[string]string{
