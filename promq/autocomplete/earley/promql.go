@@ -27,6 +27,8 @@ var (
 	BinaryExpression   = NewNonTerminal("binary-expression", false)
 	FuncExpression     = NewNonTerminal("function-expression", false)
 	SubqueryExpression = NewNonTerminal("subquery-expression", false)
+	NumLiteral         = NewNonTerminal("num-literal", false)
+	StrLiteral         = NewNonTerminal("str-literal", false)
 
 	VectorFuncExpression = NewNonTerminal("vector-function-expression", false)
 	ScalarFuncExpression = NewNonTerminal("scalar-function-expression", false)
@@ -38,7 +40,7 @@ var (
 	LabelsMatchExpression = NewNonTerminal("labels-match-expression", false)
 	LabelValueExpression  = NewNonTerminal("label-value-expression", false)
 	AggrCallExpression    = NewNonTerminal("aggr-call-expression", false)
-	MetricLabelArgs       = NewNonTerminal("func-args", false)
+	MetricLabelArgs       = NewNonTerminal("label-args", false)
 
 	OffsetExpression = NewNonTerminal("offset-expression", false)
 	//AggrFuncParam   = NewNonTerminal("func-param", false) // sometimes optional, but sometimes necessary
@@ -95,13 +97,10 @@ var (
 		//START RULE:
 		NewRule(Root, Expression, Eof),
 		// TOP LEVEL RULES:
-		// 1) an expression can be a metric/binary/aggr/function expression
-		NewRule(Expression, MetricExpression),
-		NewRule(Expression, BinaryExpression),
-		NewRule(Expression, AggrExpression),
-		NewRule(Expression, FuncExpression),
-		NewRule(Expression, Num),
-		NewRule(Expression, SubqueryExpression),
+		// 1) an expression can be a scalar/vector/matrix type expression
+		NewRule(Expression, ScalarTypeExpression),
+		NewRule(Expression, VectorTypeExpression),
+		NewRule(Expression, MatrixTypeExpression),
 
 		// EXPRESSION TYPE:
 		// 1) scalar type expression
@@ -173,13 +172,14 @@ var (
 		NewRule(LabelValueExpression, MetricLabelIdentifier, LabelMatchOperator, Str),
 		NewRule(LabelValueExpression, LabelValueExpression, Comma, MetricLabelIdentifier, LabelMatchOperator, Str),
 
-		//NewRule(LabelValueExpression, LBrace, MetricLabelIdentifier, Operator, Str, RBrace),
-
 		// BINARY EXPRESSIONS:
 		// 1) scalar type binary expr: both left and right are scalar type
 		NewRule(BinaryExpression, ScalarBinaryExpression),
 		// 2) vector type binary expr
 		NewRule(BinaryExpression, VectorBinaryExpression),
+		// binary expression can be embraced by parenthesis
+		NewRule(ScalarBinaryExpression, LParen, ScalarBinaryExpression, RParen),
+		NewRule(VectorBinaryExpression, LParen, VectorBinaryExpression, RParen),
 
 		// Binary Operators:
 		NewRule(BinaryOperator, Arithmetic),
@@ -206,8 +206,9 @@ var (
 		// Todo(yuchen) The input args can vary from different functions. Here I only separate the function with different return type.
 		NewRule(FuncExpression, ScalarFuncExpression),
 		NewRule(FuncExpression, VectorTypeExpression),
+
 		// the functions that return vector type expression
-		NewRule(VectorTypeExpression, VectorFunctionIdentifier, FunctionCallBody),
+		NewRule(VectorFuncExpression, VectorFunctionIdentifier, FunctionCallBody),
 		NewRule(FunctionCallBody, LParen, RParen),
 		NewRule(FunctionCallBody, LParen, FunctionCallArgs, RParen),
 		NewRule(FunctionCallArgs, Expression),
