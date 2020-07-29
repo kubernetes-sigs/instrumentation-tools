@@ -85,6 +85,14 @@ type TypedToken interface {
 
 type TokenType string
 
+func newStringSet(items ...TokenType) sets.String {
+	ss := sets.String{}
+	for _, item := range items {
+		ss.Insert(string(item))
+	}
+	return ss
+}
+
 const (
 	ID                   TokenType = "identifier"
 	METRIC_ID            TokenType = "metric-identifier"

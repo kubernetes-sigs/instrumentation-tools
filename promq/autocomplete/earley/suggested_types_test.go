@@ -17,8 +17,6 @@ limitations under the License.
 package earley
 
 import (
-	"reflect"
-	"sort"
 	"testing"
 )
 
@@ -81,341 +79,323 @@ func TestCompletionContext(t *testing.T) {
 
 func TestSuggestedTypes(t *testing.T) {
 	testCases := []struct {
-		name              string
-		inputString       string
-		tokenPosList      []int
-		expectedTypesList [][]TokenType
+		name                         string
+		inputString                  string
+		expectedTypesFromParsePosMap map[int][]TokenType
 	}{
 		{
-			name:              "If we've consumed zero tokens, then we should suggest",
-			inputString:       "blah",
-			tokenPosList:      []int{0},
-			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP}},
-		},
-		{
-			name:              "If we have an empty string, then we should suggest",
-			inputString:       "",
-			tokenPosList:      []int{0},
-			expectedTypesList: [][]TokenType{{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP}},
-		},
-		{
-			name:         "Binary Expression - scalar binary with arithmetic operation",
-			inputString:  "123 + 4",
-			tokenPosList: []int{1, 2, 3},
-			expectedTypesList: [][]TokenType{
-				{ARITHMETIC, COMPARISION, EOF},
-				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{EOF, ARITHMETIC, COMPARISION},
+			name:        "If we've consumed zero tokens, then we should suggest",
+			inputString: "blah",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				0: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
 			},
 		},
 		{
-			name:         "Binary Expression - with unary expression",
-			inputString:  "123 + (-4)",
-			tokenPosList: []int{2, 3, 4, 5, 6},
-			expectedTypesList: [][]TokenType{
-				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{UNARY_OP, NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{RIGHT_PAREN, COMPARISION, ARITHMETIC},
-				{EOF, ARITHMETIC, COMPARISION},
+			name:        "If we have an empty string, then we should suggest",
+			inputString: "",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				0: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
 			},
 		},
 		{
-			name:         "Binary Expression - scalar binary with comparision operation",
-			inputString:  "123 + 4 <= bool 10",
-			tokenPosList: []int{1, 2, 3, 4, 5},
-			expectedTypesList: [][]TokenType{
-				{ARITHMETIC, COMPARISION, EOF},
-				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{EOF, ARITHMETIC, COMPARISION},
-				{BOOL_KW, NUM, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, METRIC_ID, LEFT_PAREN},
-				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+			name:        "Binary Expression - scalar binary with arithmetic operation",
+			inputString: "123 + 4",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				1: {ARITHMETIC, COMPARISION, EOF},
+				2: {NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				3: {EOF, ARITHMETIC, COMPARISION},
 			},
 		},
 		{
-			name:              "Binary Expression - no suggestion because set operators only apply between two vectors",
-			inputString:       "123 and 3",
-			tokenPosList:      []int{2},
-			expectedTypesList: [][]TokenType{{}},
-		},
-		{
-			name:         "Binary Expression - vector binary with set operation",
-			inputString:  "foo and bar",
-			tokenPosList: []int{1, 2, 3},
-			expectedTypesList: [][]TokenType{
-				{ARITHMETIC, COMPARISION, SET, OFFSET_KW, LEFT_BRACKET, LEFT_BRACE, LEFT_PAREN, EOF},
-				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, GROUP_KW, LEFT_PAREN},
-				{OFFSET_KW, LEFT_PAREN, LEFT_BRACE, LEFT_BRACKET, SET, COMPARISION, ARITHMETIC, EOF},
+			name:        "Binary Expression - with unary expression",
+			inputString: "123 + (-4)",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				2: {NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				3: {UNARY_OP, NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				4: {NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				5: {RIGHT_PAREN, COMPARISION, ARITHMETIC},
+				6: {EOF, ARITHMETIC, COMPARISION},
 			},
 		},
 		{
-			name:         "Binary Expression - one_to_one vector match with arithmetic operator",
-			inputString:  "foo * on(test,) bar",
-			tokenPosList: []int{2, 3, 4, 5, 6, 7, 8},
-			expectedTypesList: [][]TokenType{
-				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, GROUP_KW, LEFT_PAREN},
-				{LEFT_PAREN},
-				{RIGHT_PAREN, METRIC_LABEL_SUBTYPE},
-				{COMMA, RIGHT_PAREN},
-				{RIGHT_PAREN, METRIC_LABEL_SUBTYPE},
-				{GROUP_SIDE, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
-				{SET, OFFSET_KW, LEFT_PAREN, LEFT_BRACKET, LEFT_BRACE, COMPARISION, ARITHMETIC, EOF},
+			name:        "Binary Expression - scalar binary with comparision operation",
+			inputString: "123 + 4 <= bool 10",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				1: {ARITHMETIC, COMPARISION, EOF},
+				2: {NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				3: {EOF, ARITHMETIC, COMPARISION},
+				4: {BOOL_KW, NUM, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, METRIC_ID, LEFT_PAREN},
+				5: {NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
 			},
 		},
 		{
-			name:         "Binary Expression - one_to_one vector match with set operator",
-			inputString:  "foo and on(test,) bar",
-			tokenPosList: []int{7, 8},
-			expectedTypesList: [][]TokenType{
-				{NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
-				{SET, OFFSET_KW, LEFT_PAREN, LEFT_BRACKET, LEFT_BRACE, COMPARISION, ARITHMETIC, EOF},
+			name:        "Binary Expression - no suggestion because set operators only apply between two vectors",
+			inputString: "123 and 3",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				2: {},
 			},
 		},
 		{
-			name:         "Binary Expression - one_to_many vector match",
-			inputString:  "foo / on(test,blub) group_left (bar,) bar",
-			tokenPosList: []int{8, 9, 10, 11, 12, 13, 14},
-			expectedTypesList: [][]TokenType{
-				{GROUP_SIDE, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
-				{LEFT_PAREN, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP},
-				{METRIC_LABEL_SUBTYPE, RIGHT_PAREN, NUM, METRIC_ID, LEFT_PAREN, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, UNARY_OP},
-				{COMMA, RIGHT_PAREN, OFFSET_KW, LEFT_PAREN, COMPARISION, ARITHMETIC, LEFT_BRACE, SET},
-				{METRIC_LABEL_SUBTYPE, RIGHT_PAREN},
-				{NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
-				{SET, OFFSET_KW, LEFT_PAREN, LEFT_BRACKET, LEFT_BRACE, COMPARISION, ARITHMETIC, EOF},
+			name:        "Binary Expression - vector binary with set operation",
+			inputString: "foo and bar",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				1: {ARITHMETIC, COMPARISION, SET, OFFSET_KW, LEFT_BRACKET, LEFT_BRACE, LEFT_PAREN, EOF},
+				2: {NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, GROUP_KW, LEFT_PAREN},
+				3: {OFFSET_KW, LEFT_PAREN, LEFT_BRACE, LEFT_BRACKET, SET, COMPARISION, ARITHMETIC, EOF},
 			},
 		},
 		{
-			name:         "Metric Expression - with labels",
-			inputString:  "metric_name{label1='foo', label2='bar'}",
-			tokenPosList: []int{1, 2, 3, 4, 5, 6, 10},
-			expectedTypesList: [][]TokenType{
-				{EOF, LEFT_BRACE, OFFSET_KW, LEFT_BRACKET, LEFT_PAREN, COMPARISION, ARITHMETIC, SET},
-				{METRIC_LABEL_SUBTYPE},
-				{LABELMATCH},
-				{STRING},
-				{RIGHT_BRACE, COMMA},
-				{METRIC_LABEL_SUBTYPE},
-				{EOF, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
+			name:        "Binary Expression - one_to_one vector match with arithmetic operator",
+			inputString: "foo * on(test,) bar",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				2: {NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, GROUP_KW, LEFT_PAREN},
+				3: {LEFT_PAREN},
+				4: {RIGHT_PAREN, METRIC_LABEL_SUBTYPE},
+				5: {COMMA, RIGHT_PAREN},
+				6: {RIGHT_PAREN, METRIC_LABEL_SUBTYPE},
+				7: {GROUP_SIDE, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
+				8: {SET, OFFSET_KW, LEFT_PAREN, LEFT_BRACKET, LEFT_BRACE, COMPARISION, ARITHMETIC, EOF},
 			},
 		},
 		{
-			name:         "Metric Expression - metric name contains `:`",
-			inputString:  "metric:name{label1='foo', label2='bar'}",
-			tokenPosList: []int{1, 2, 3, 4, 5, 6, 10},
-			expectedTypesList: [][]TokenType{
-				{EOF, LEFT_BRACE, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
-				{METRIC_LABEL_SUBTYPE},
-				{LABELMATCH},
-				{STRING},
-				{RIGHT_BRACE, COMMA},
-				{METRIC_LABEL_SUBTYPE},
-				{EOF, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
+			name:        "Binary Expression - one_to_one vector match with set operator",
+			inputString: "foo and on(test,) bar",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				7: {NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
+				8: {SET, OFFSET_KW, LEFT_PAREN, LEFT_BRACKET, LEFT_BRACE, COMPARISION, ARITHMETIC, EOF},
 			},
 		},
 		{
-			name:              "Metric Expression - with offset",
-			inputString:       "metric_name offset 5m",
-			tokenPosList:      []int{2, 3},
-			expectedTypesList: [][]TokenType{{DURATION}, {EOF, COMPARISION, ARITHMETIC, LEFT_BRACKET, SET}},
-		},
-		{
-			name:              "Metric Expression - range vector selector",
-			inputString:       "metric_name[3m] offset 5m",
-			tokenPosList:      []int{2, 3, 4},
-			expectedTypesList: [][]TokenType{{DURATION}, {RIGHT_BRACKET, COLON}, {EOF, OFFSET_KW}},
-		},
-		{
-			name:         "Aggregation expression - the clause is after expression",
-			inputString:  "sum(metric_name)",
-			tokenPosList: []int{1, 2, 3, 4},
-			expectedTypesList: [][]TokenType{
-				{AGGR_KW, LEFT_PAREN},
-				{METRIC_ID, NUM, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
-				{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW, LEFT_PAREN, COMPARISION, ARITHMETIC, SET},
-				{AGGR_KW, EOF, COMPARISION, ARITHMETIC, LEFT_BRACKET, SET},
+			name:        "Binary Expression - one_to_many vector match",
+			inputString: "foo / on(test,blub) group_left (bar,) bar",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				8:  {GROUP_SIDE, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
+				9:  {LEFT_PAREN, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP},
+				10: {METRIC_LABEL_SUBTYPE, RIGHT_PAREN, NUM, METRIC_ID, LEFT_PAREN, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, UNARY_OP},
+				11: {COMMA, RIGHT_PAREN, OFFSET_KW, LEFT_PAREN, COMPARISION, ARITHMETIC, LEFT_BRACE, SET},
+				12: {METRIC_LABEL_SUBTYPE, RIGHT_PAREN},
+				13: {NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
+				14: {SET, OFFSET_KW, LEFT_PAREN, LEFT_BRACKET, LEFT_BRACE, COMPARISION, ARITHMETIC, EOF},
 			},
 		},
 		{
-			name:         "Aggregation expression - the clause is before expression",
-			inputString:  "sum by (label1, labels) (metricname)",
-			tokenPosList: []int{1, 2, 3, 4, 5, 7, 8},
-			expectedTypesList: [][]TokenType{
-				{AGGR_KW, LEFT_PAREN},
-				{LEFT_PAREN},
-				{RIGHT_PAREN, METRIC_LABEL_SUBTYPE},
-				{RIGHT_PAREN, COMMA},
-				{METRIC_LABEL_SUBTYPE, RIGHT_PAREN},
-				{LEFT_PAREN},
-				{METRIC_ID, NUM, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
+			name:        "Metric Expression - with labels",
+			inputString: "metric_name{label1='foo', label2='bar'}",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				1:  {EOF, LEFT_BRACE, OFFSET_KW, LEFT_BRACKET, LEFT_PAREN, COMPARISION, ARITHMETIC, SET},
+				2:  {METRIC_LABEL_SUBTYPE},
+				3:  {LABELMATCH},
+				4:  {STRING},
+				5:  {RIGHT_BRACE, COMMA},
+				6:  {METRIC_LABEL_SUBTYPE},
+				10: {EOF, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
 			},
 		},
 		{
-			name:         "Aggregation expression - multiple label matchers",
-			inputString:  "sum(metricname{label1='foo', label2='bar'})",
-			tokenPosList: []int{4, 5, 6, 7, 8, 12, 13},
-			expectedTypesList: [][]TokenType{
-				{METRIC_LABEL_SUBTYPE},
-				{LABELMATCH},
-				{STRING},
-				{RIGHT_BRACE, COMMA},
-				{METRIC_LABEL_SUBTYPE},
-				{RIGHT_PAREN, OFFSET_KW, ARITHMETIC, COMPARISION, SET},
-				{AGGR_KW, EOF, COMPARISION, ARITHMETIC, LEFT_BRACKET, SET},
+			name:        "Metric Expression - metric name contains `:`",
+			inputString: "metric:name{label1='foo', label2='bar'}",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				1:  {EOF, LEFT_BRACE, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
+				2:  {METRIC_LABEL_SUBTYPE},
+				3:  {LABELMATCH},
+				4:  {STRING},
+				5:  {RIGHT_BRACE, COMMA},
+				6:  {METRIC_LABEL_SUBTYPE},
+				10: {EOF, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
 			},
 		},
 		{
-			name:         "Aggregation expression - has label list",
-			inputString:  "sum(metricname{label1='foo', label2='bar'}) by (label1, label2)",
-			tokenPosList: []int{14, 15, 16, 17},
-			expectedTypesList: [][]TokenType{
-				{LEFT_PAREN},
-				{RIGHT_PAREN, METRIC_LABEL_SUBTYPE},
-				{RIGHT_PAREN, COMMA},
-				{METRIC_LABEL_SUBTYPE, RIGHT_PAREN},
+			name:        "Metric Expression - with offset",
+			inputString: "metric_name offset 5m",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				2: {DURATION},
+				3: {EOF, COMPARISION, ARITHMETIC, LEFT_BRACKET, SET},
 			},
 		},
 		{
-			name:         "Function expression - scalar function",
-			inputString:  "scalar(metricname)",
-			tokenPosList: []int{2, 3, 4},
-			expectedTypesList: [][]TokenType{
-				{RIGHT_PAREN, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
-				{OFFSET_KW, LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, COMPARISION, ARITHMETIC, SET},
-				{EOF, ARITHMETIC, COMPARISION},
+			name:        "Metric Expression - range vector selector",
+			inputString: "metric_name[3m] offset 5m",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				2: {DURATION},
+				3: {RIGHT_BRACKET, COLON},
+				4: {EOF, OFFSET_KW},
 			},
 		},
 		{
-			name:         "Function expression - have expression as arg",
-			inputString:  "floor(metricname{foo!='bar'})",
-			tokenPosList: []int{8, 9},
-			expectedTypesList: [][]TokenType{
-				{RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
-				{EOF, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
+			name:        "Aggregation expression - the clause is after expression",
+			inputString: "sum(metric_name)",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				1: {AGGR_KW, LEFT_PAREN},
+				2: {METRIC_ID, NUM, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
+				3: {RIGHT_PAREN, LEFT_BRACE, OFFSET_KW, LEFT_PAREN, COMPARISION, ARITHMETIC, SET},
+				4: {AGGR_KW, EOF, COMPARISION, ARITHMETIC, LEFT_BRACKET, SET},
 			},
 		},
 		{
-			name:         "Function expression - have aggregation expression as arg",
-			inputString:  "vector(sum(metricname{foo!='bar'}))",
-			tokenPosList: []int{10, 11},
-			expectedTypesList: [][]TokenType{
-				{RIGHT_PAREN, OFFSET_KW, COMPARISION, ARITHMETIC, SET},
-				{RIGHT_PAREN, COMMA, AGGR_KW, COMPARISION, ARITHMETIC, LEFT_BRACKET, SET},
+			name:        "Aggregation expression - the clause is before expression",
+			inputString: "sum by (label1, labels) (metricname)",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				1: {AGGR_KW, LEFT_PAREN},
+				2: {LEFT_PAREN},
+				3: {RIGHT_PAREN, METRIC_LABEL_SUBTYPE},
+				4: {RIGHT_PAREN, COMMA},
+				5: {METRIC_LABEL_SUBTYPE, RIGHT_PAREN},
+				7: {LEFT_PAREN},
+				8: {METRIC_ID, NUM, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
 			},
 		},
 		{
-			name:         "Function expression - have multiple args",
-			inputString:  "round(metricname, -5)",
-			tokenPosList: []int{3, 4, 5, 6},
-			expectedTypesList: [][]TokenType{
-				{RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, LEFT_PAREN, LEFT_BRACE, COMPARISION, ARITHMETIC, SET},
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, LEFT_PAREN, UNARY_OP},
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, LEFT_PAREN},
-				{RIGHT_PAREN, COMMA, COMPARISION, ARITHMETIC},
+			name:        "Aggregation expression - multiple label matchers",
+			inputString: "sum(metricname{label1='foo', label2='bar'})",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				4:  {METRIC_LABEL_SUBTYPE},
+				5:  {LABELMATCH},
+				6:  {STRING},
+				7:  {RIGHT_BRACE, COMMA},
+				8:  {METRIC_LABEL_SUBTYPE},
+				12: {RIGHT_PAREN, OFFSET_KW, ARITHMETIC, COMPARISION, SET},
+				13: {AGGR_KW, EOF, COMPARISION, ARITHMETIC, LEFT_BRACKET, SET},
 			},
 		},
 		{
-			name:         "Function expression - nested function call",
-			inputString:  "ceil(abs(metricname{foo!='bar'}))",
-			tokenPosList: []int{3, 4, 10, 11},
-			expectedTypesList: [][]TokenType{
-				{LEFT_PAREN},
-				{RIGHT_PAREN, METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
-				{RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
-				{RIGHT_PAREN, COMMA, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
+			name:        "Aggregation expression - has label list",
+			inputString: "sum(metricname{label1='foo', label2='bar'}) by (label1, label2)",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				14: {LEFT_PAREN},
+				15: {RIGHT_PAREN, METRIC_LABEL_SUBTYPE},
+				16: {RIGHT_PAREN, COMMA},
+				17: {METRIC_LABEL_SUBTYPE, RIGHT_PAREN},
 			},
 		},
 		{
-			name:         "Subquery expression - expr is vectorSelector",
-			inputString:  "metricname{foo='bar'}[10m:6s]",
-			tokenPosList: []int{6, 7, 8, 9, 10, 11},
-			expectedTypesList: [][]TokenType{
-				{EOF, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
-				{DURATION},
-				{COLON, RIGHT_BRACKET},
-				{DURATION, RIGHT_BRACKET},
-				{RIGHT_BRACKET},
-				{EOF, OFFSET_KW},
+			name:        "Function expression - scalar function",
+			inputString: "scalar(metricname)",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				2: {RIGHT_PAREN, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
+				3: {OFFSET_KW, LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, COMPARISION, ARITHMETIC, SET},
+				4: {EOF, ARITHMETIC, COMPARISION},
 			},
 		},
 		{
-			name:         "Subquery expression - expr is function expression",
-			inputString:  "rate(metricname{foo='bar'}[5m])[10m:6s]",
-			tokenPosList: []int{12, 13, 14, 15, 16, 17},
-			expectedTypesList: [][]TokenType{
-				{EOF, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
-				{DURATION},
-				{COLON},
-				{DURATION, RIGHT_BRACKET},
-				{RIGHT_BRACKET},
-				{EOF, OFFSET_KW},
+			name:        "Function expression - have expression as arg",
+			inputString: "floor(metricname{foo!='bar'})",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				8: {RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
+				9: {EOF, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
 			},
 		},
 		{
-			name:         "Parentheses expression - number arithmetic",
-			inputString:  "1 + 2/(3*1)",
-			tokenPosList: []int{4, 5, 6, 7, 8, 9},
-			expectedTypesList: [][]TokenType{
-				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
-				{COMPARISION, ARITHMETIC},
-				{NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{RIGHT_PAREN, ARITHMETIC, COMPARISION},
-				{COMPARISION, ARITHMETIC, EOF},
+			name:        "Function expression - have aggregation expression as arg",
+			inputString: "vector(sum(metricname{foo!='bar'}))",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				10: {RIGHT_PAREN, OFFSET_KW, COMPARISION, ARITHMETIC, SET},
+				11: {RIGHT_PAREN, COMMA, AGGR_KW, COMPARISION, ARITHMETIC, LEFT_BRACKET, SET},
 			},
 		},
 		{
-			name:         "Parentheses expression - matrix type",
-			inputString:  "(foo + bar{nm='val'})[5m:] offset 10m",
-			tokenPosList: []int{9, 10, 11, 12, 13, 14, 15, 16},
-			expectedTypesList: [][]TokenType{
-				{RIGHT_PAREN, OFFSET_KW, ARITHMETIC, COMPARISION, SET},
-				{LEFT_BRACKET, ARITHMETIC, COMPARISION, SET, EOF},
-				{DURATION},
-				{COLON},
-				{RIGHT_BRACKET, DURATION},
-				{EOF, OFFSET_KW},
-				{DURATION},
-				{EOF},
+			name:        "Function expression - have multiple args",
+			inputString: "round(metricname, -5)",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				3: {RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, LEFT_PAREN, LEFT_BRACE, COMPARISION, ARITHMETIC, SET},
+				4: {METRIC_ID, NUM, AGGR_OP, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, LEFT_PAREN, UNARY_OP},
+				5: {METRIC_ID, NUM, AGGR_OP, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, LEFT_PAREN},
+				6: {RIGHT_PAREN, COMMA, COMPARISION, ARITHMETIC},
 			},
 		},
 		{
-			name:         "Parentheses expression - nested parentheses",
-			inputString:  "((foo + bar{nm='val'}) + metric_name) + 1",
-			tokenPosList: []int{0, 1, 11, 12, 13, 14, 15, 16},
-			expectedTypesList: [][]TokenType{
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
-				{RIGHT_PAREN, SET, ARITHMETIC, COMPARISION},
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, GROUP_KW},
-				{OFFSET_KW, LEFT_BRACE, LEFT_PAREN, COMPARISION, SET, ARITHMETIC, RIGHT_PAREN},
-				{EOF, LEFT_BRACKET, COMPARISION, SET, ARITHMETIC},
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, GROUP_KW},
-				{EOF, COMPARISION, SET, ARITHMETIC, LEFT_BRACKET},
+			name:        "Function expression - nested function call",
+			inputString: "ceil(abs(metricname{foo!='bar'}))",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				3:  {LEFT_PAREN},
+				4:  {RIGHT_PAREN, METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
+				10: {RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
+				11: {RIGHT_PAREN, COMMA, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
 			},
 		},
 		{
-			name:         "Unary expression - number",
-			inputString:  "-1 + 2 * 5",
-			tokenPosList: []int{0, 1, 2, 3, 4, 5, 6},
-			expectedTypesList: [][]TokenType{
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{EOF, ARITHMETIC, COMPARISION},
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{ARITHMETIC, COMPARISION, EOF},
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{ARITHMETIC, COMPARISION, EOF},
+			name:        "Subquery expression - expr is vectorSelector",
+			inputString: "metricname{foo='bar'}[10m:6s]",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				6:  {EOF, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
+				7:  {DURATION},
+				8:  {COLON, RIGHT_BRACKET},
+				9:  {DURATION, RIGHT_BRACKET},
+				10: {RIGHT_BRACKET},
+				11: {EOF, OFFSET_KW},
 			},
 		},
 		{
-			name:         "Unary expression - metrics",
-			inputString:  "-foo",
-			tokenPosList: []int{0, 1, 2},
-			expectedTypesList: [][]TokenType{
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
-				{METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				{EOF, ARITHMETIC, COMPARISION, SET, LEFT_PAREN, LEFT_BRACE, OFFSET_KW},
+			name:        "Subquery expression - expr is function expression",
+			inputString: "rate(metricname{foo='bar'}[5m])[10m:6s]",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				12: {EOF, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
+				13: {DURATION},
+				14: {COLON},
+				15: {DURATION, RIGHT_BRACKET},
+				16: {RIGHT_BRACKET},
+				17: {EOF, OFFSET_KW},
+			},
+		},
+		{
+			name:        "Parentheses expression - number arithmetic",
+			inputString: "1 + 2/(3*1)",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				4: {NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				5: {NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
+				6: {COMPARISION, ARITHMETIC},
+				7: {NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				8: {RIGHT_PAREN, ARITHMETIC, COMPARISION},
+				9: {COMPARISION, ARITHMETIC, EOF},
+			},
+		},
+		{
+			name:        "Parentheses expression - matrix type",
+			inputString: "(foo + bar{nm='val'})[5m:] offset 10m",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				9:  {RIGHT_PAREN, OFFSET_KW, ARITHMETIC, COMPARISION, SET},
+				10: {LEFT_BRACKET, ARITHMETIC, COMPARISION, SET, EOF},
+				11: {DURATION},
+				12: {COLON},
+				13: {RIGHT_BRACKET, DURATION},
+				14: {EOF, OFFSET_KW},
+				15: {DURATION},
+				16: {EOF},
+			},
+		},
+		{
+			name:        "Parentheses expression - nested parentheses",
+			inputString: "((foo + bar{nm='val'}) + metric_name) + 1",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				0:  {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
+				1:  {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
+				11: {RIGHT_PAREN, SET, ARITHMETIC, COMPARISION},
+				12: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, GROUP_KW},
+				13: {OFFSET_KW, LEFT_BRACE, LEFT_PAREN, COMPARISION, SET, ARITHMETIC, RIGHT_PAREN},
+				14: {EOF, LEFT_BRACKET, COMPARISION, SET, ARITHMETIC},
+				15: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, GROUP_KW},
+				16: {EOF, COMPARISION, SET, ARITHMETIC, LEFT_BRACKET},
+			},
+		},
+		{
+			name:        "Unary expression - number",
+			inputString: "-1 + 2 * 5",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				0: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
+				1: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				2: {EOF, ARITHMETIC, COMPARISION},
+				3: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				4: {ARITHMETIC, COMPARISION, EOF},
+				5: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				6: {ARITHMETIC, COMPARISION, EOF},
+			},
+		},
+		{
+			name:        "Unary expression - metrics",
+			inputString: "-foo",
+			expectedTypesFromParsePosMap: map[int][]TokenType{
+				0: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
+				1: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
+				2: {EOF, ARITHMETIC, COMPARISION, SET, LEFT_PAREN, LEFT_BRACE, OFFSET_KW},
 			},
 		},
 	}
@@ -423,15 +403,15 @@ func TestSuggestedTypes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := NewEarleyParser(*promQLGrammar)
 			chart := p.Parse(tc.inputString)
-			for i, pos := range tc.tokenPosList {
+			for pos, types := range tc.expectedTypesFromParsePosMap {
 				validTypes := chart.GetValidTerminalTypesAtStateSet(pos)
 				var tknTypes []TokenType
 				for _, ct := range validTypes {
 					tknTypes = append(tknTypes, ct.TokenType)
 				}
 
-				if !isEqualTypes(tknTypes, tc.expectedTypesList[i]) {
-					t.Errorf("Position %d: Got %v, expected %v\n", pos, tknTypes, tc.expectedTypesList[i])
+				if !isEqualTypes(tknTypes, types) {
+					t.Errorf("Position %d: Got %v, expected %v\n", pos, tknTypes, types)
 				}
 			}
 		})
@@ -514,18 +494,6 @@ func safeRead(sp *string) string {
 	return *sp
 }
 
-func isEqualTypes(actual []TokenType, expected []TokenType) bool {
-	if len(actual) == 0 && len(expected) == 0 {
-		return true
-	}
-	sort.Slice(actual, func(i, j int) bool {
-		return actual[i] > actual[j]
-	})
-	sort.Slice(expected, func(k, j int) bool {
-		return expected[k] > expected[j]
-	})
-	if !reflect.DeepEqual(actual, expected) {
-		return false
-	}
-	return true
+func isEqualTypes(actual interface{}, expected interface{}) bool {
+	return newStringSet(actual.([]TokenType)...).Equal(newStringSet(expected.([]TokenType)...))
 }
