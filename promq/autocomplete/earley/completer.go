@@ -18,6 +18,7 @@ package earley
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"sigs.k8s.io/instrumentation-tools/debug"
@@ -131,6 +132,63 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 				newMatch := NewPartialMatch(ao, "aggr-keyword", aggregateKeywords[ao])
 				matches = append(matches, newMatch)
 			}
+		case ARITHMETIC:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(arithmeticOperators), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "arithmetic", arithmeticOperators[ao])
+				matches = append(matches, newMatch)
+			}
+		case COMPARISION:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(comparisionOperators), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "comparision", comparisionOperators[ao])
+				matches = append(matches, newMatch)
+			}
+		case SET:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(setOperators), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "logical", setOperators[ao])
+				matches = append(matches, newMatch)
+			}
+		case LABELMATCH:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(labelMatchOperators), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "label-match", labelMatchOperators[ao])
+				matches = append(matches, newMatch)
+			}
+		case UNARY_OP:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(unaryOperators), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "unary", unaryOperators[ao])
+				matches = append(matches, newMatch)
+			}
+		case OFFSET_KW:
+			matches = append(matches, NewPartialMatch("offset", "keyword", keywords["offset"]))
+		case BOOL_KW:
+			matches = append(matches, NewPartialMatch("bool", "keyword", keywords["bool"]))
+		case GROUP_SIDE:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(groupSideKeywords), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "keyword", groupSideKeywords[ao])
+				matches = append(matches, newMatch)
+			}
+		case GROUP_KW:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(groupKeywords), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "keyword", groupKeywords[ao])
+				matches = append(matches, newMatch)
+			}
+		case DURATION:
+			// add time units to match is the prefix is number
+			if _, err := strconv.Atoi(autocompletePrefix); err == nil {
+				for _, ao := range sets.StringKeySet(timeUnits).List() {
+					newMatch := NewPartialMatch(ao, "time-unit", timeUnits[ao])
+					matches = append(matches, newMatch)
+				}
+			}
+		case FUNCTION_VECTOR_ID:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(vectorFunctions), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "label-match", vectorFunctions[ao])
+				matches = append(matches, newMatch)
+			}
+		case FUNCTION_SCALAR_ID:
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(scalarFunctions), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, "label-match", scalarFunctions[ao])
+				matches = append(matches, newMatch)
+			}
 		}
 		sort.Slice(matches, func(i, j int) bool {
 			return matches[i].GetValue() > matches[j].GetValue()
@@ -146,6 +204,8 @@ func getPrefix(query string) string {
 	for i := len(query) - 1; i >= 0; i-- {
 		c := []rune(query)[i]
 		if strings.ContainsRune(PromQLTokenSeparators, c) {
+			// Todo(yuchen): what if the input is sum(metric_a and metric_a is the completed metric name?
+			// Should we return metric_a as a prefix or return the next suggested token of metric name?
 			return query[i+1:]
 		}
 	}

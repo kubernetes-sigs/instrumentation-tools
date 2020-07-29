@@ -19,6 +19,7 @@ package earley
 
 import (
 	"fmt"
+	"sigs.k8s.io/instrumentation-tools/notstdlib/sets"
 	"strings"
 
 	"github.com/prometheus/prometheus/promql"
@@ -84,23 +85,54 @@ type TypedToken interface {
 
 type TokenType string
 
+func newStringSet(items ...TokenType) sets.String {
+	ss := sets.String{}
+	for _, item := range items {
+		ss.Insert(string(item))
+	}
+	return ss
+}
+
 const (
 	ID                   TokenType = "identifier"
 	METRIC_ID            TokenType = "metric-identifier"
 	METRIC_LABEL_SUBTYPE TokenType = "metric-label-identifier"
-	ARITHMETIC           TokenType = "arithmetic"
-	OPERATOR             TokenType = "operator"
-	AGGR_OP              TokenType = "aggregator_operation"
-	AGGR_KW              TokenType = "aggregator_keyword"
-	LEFT_BRACE           TokenType = "leftbrace"
-	RIGHT_BRACE          TokenType = "rightbrace"
-	LEFT_PAREN           TokenType = "leftparen"
-	COMMA                TokenType = "comma"
-	RIGHT_PAREN          TokenType = "rightparen"
-	STRING               TokenType = "string"
-	NUM                  TokenType = "number"
-	EOF                  TokenType = "EOF"
-	UNKNOWN              TokenType = "unknown"
+	FUNCTION_SCALAR_ID   TokenType = "function-scalar-identifier"
+	FUNCTION_VECTOR_ID   TokenType = "function-vector-identifier"
+
+	OPERATOR TokenType = "operator"
+	//binary operators
+	ARITHMETIC  TokenType = "arithmetic"
+	COMPARISION TokenType = "comparision"
+	SET         TokenType = "set"
+	//label match operator
+	LABELMATCH TokenType = "label-match"
+	// unary operators
+	UNARY_OP TokenType = "unary-op"
+
+	AGGR_OP TokenType = "aggregator_operation"
+
+	//keywords
+	KEYWORD    TokenType = "keyword"
+	AGGR_KW    TokenType = "aggregator_keyword"
+	BOOL_KW    TokenType = "bool-keyword"
+	OFFSET_KW  TokenType = "offset-keyword"
+	GROUP_SIDE TokenType = "group-side"
+	GROUP_KW   TokenType = "group-keyword"
+
+	LEFT_BRACE    TokenType = "leftbrace"
+	RIGHT_BRACE   TokenType = "rightbrace"
+	LEFT_PAREN    TokenType = "leftparen"
+	RIGHT_PAREN   TokenType = "rightparen"
+	LEFT_BRACKET  TokenType = "leftbracket"
+	RIGHT_BRACKET TokenType = "rightbracket"
+	COMMA         TokenType = "comma"
+	COLON         TokenType = "colon"
+	STRING        TokenType = "string"
+	NUM           TokenType = "number"
+	DURATION      TokenType = "duration"
+	EOF           TokenType = "EOF"
+	UNKNOWN       TokenType = "unknown"
 )
 
 // Tokhan contains the essential bits of data we need
@@ -186,15 +218,29 @@ func createTokenFromItem(item promql.Item, offset int) Tokhan {
 func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 	t := item.Typ
 	switch {
-	case item.Val == "by", item.Val == "without":
+	case t == promql.BY, t == promql.WITHOUT:
 		return AGGR_KW
+	case t == promql.OFFSET:
+		return OFFSET_KW
+	case t == promql.BOOL:
+		return BOOL_KW
+	case t == promql.GROUP_LEFT, t == promql.GROUP_RIGHT:
+		return GROUP_SIDE
+	case t == promql.IGNORING, t == promql.ON:
+		return GROUP_KW
 	case t == promql.EOF:
 		return EOF
 	case t == promql.STRING:
 		return STRING
 	case isAggregator(t):
 		return AGGR_OP
-	case t == promql.IDENTIFIER, t == promql.METRIC_IDENTIFIER:
+	case t == promql.METRIC_IDENTIFIER:
+		return METRIC_ID
+	case isScalarFunction(item):
+		return FUNCTION_SCALAR_ID
+	case isVectorFunction(item):
+		return FUNCTION_VECTOR_ID
+	case t == promql.IDENTIFIER:
 		return ID
 	case t == promql.LEFT_BRACE:
 		return LEFT_BRACE
@@ -204,12 +250,22 @@ func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 		return LEFT_PAREN
 	case t == promql.RIGHT_PAREN:
 		return RIGHT_PAREN
-	case t == promql.ADD, t == promql.SUB, t == promql.MUL, t == promql.DIV:
+	case t == promql.LEFT_BRACKET:
+		return LEFT_BRACKET
+	case t == promql.RIGHT_BRACKET:
+		return RIGHT_BRACKET
+	case t == promql.DURATION:
+		return DURATION
+	case t == promql.ADD, t == promql.SUB, t == promql.MUL, t == promql.DIV, t == promql.MOD, t == promql.POW:
 		return ARITHMETIC
+	case t == promql.LAND, t == promql.LOR, t == promql.LUNLESS:
+		return SET
+	case isOperator(t):
+		return OPERATOR
 	case t == promql.COMMA:
 		return COMMA
-	case t == promql.EQL:
-		return OPERATOR
+	case t == promql.COLON:
+		return COLON
 	case t == promql.NUMBER:
 		return NUM
 	default:
@@ -219,6 +275,28 @@ func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 
 // need to explicitly extract this function since it's private
 // in prometheus 2.16
-func isAggregator(item promql.ItemType) bool{
+func isAggregator(item promql.ItemType) bool {
 	return item > 57386 && item < 57398
+}
+
+func isOperator(item promql.ItemType) bool {
+	return item > 57367 && item < 57385
+}
+
+func isScalarFunction(item promql.Item) bool {
+	for _, v := range sets.StringKeySet(scalarFunctions).List() {
+		if v == item.Val {
+			return true
+		}
+	}
+	return false
+}
+
+func isVectorFunction(item promql.Item) bool {
+	for _, v := range sets.StringKeySet(vectorFunctions).List() {
+		if v == item.Val {
+			return true
+		}
+	}
+	return false
 }

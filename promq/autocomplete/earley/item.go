@@ -111,7 +111,7 @@ func (item *EarleyItem) badhash() uint64 {
 	// let's just assume we don't have more than 1k rules,
 	// or rules which are over 500 chars long,
 	// or more than 500 symbols
-	return uint64(item.Rule.grammarRuleId)<<32 | uint64(item.RulePos)
+	return uint64(item.Rule.grammarRuleId)<<32 | uint64(item.RulePos)<<16 | uint64(item.originatingIndex)
 }
 
 // complete means that dot reaches the end
