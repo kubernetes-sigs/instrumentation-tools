@@ -24,38 +24,6 @@ import (
 	"sigs.k8s.io/instrumentation-tools/promq/term"
 )
 
-func basicCells(text string, sty tcell.Style, fillerWidth int) []tcell.SimCell {
-	cells := make([]tcell.SimCell, 0, fillerWidth)
-
-	for _, rn := range text {
-		cells = append(cells, tcell.SimCell{
-			Runes: []rune{rn},
-			Bytes: []byte(string(rn)),
-			Style: sty,
-		})
-	}
-	for i := len(cells); i < fillerWidth; i++ {
-		cells = append(cells, tcell.SimCell{
-			Bytes: []byte(" "),
-			Runes: []rune{' '},
-			Style: tcell.StyleDefault,
-		})
-	}
-
-	return cells
-}
-
-func flushToCells(contents term.Flushable, screenCols, screenRows int) []tcell.SimCell {
-	screen := tcell.NewSimulationScreen("")
-	screen.Init()
-	screen.SetSize(screenCols, screenRows)
-	contents.FlushTo(screen)
-	screen.Show()
-
-	cells, _, _ := screen.GetContents()
-	return cells
-}
-
 var _ = Describe("The TextBox widget", func() {
 	It("should still save text written before the size is set", func() {
 		box := &term.TextBox{}
@@ -63,8 +31,7 @@ var _ = Describe("The TextBox widget", func() {
 		box.SetBox(term.PositionBox{
 			Rows: 1, Cols: 200,
 		})
-		cells := flushToCells(box, 200, 1)
-		Expect(cells).To(Equal(basicCells("the time has come, the walrus said, to talk of many things", tcell.StyleDefault, 200)))
+		Expect(box).To(DisplayLike(200, 1, "the time has come, the walrus said, to talk of many things"))
 	})
 
 	It("should handle text with newlines properly, converting them to proper cursor movement", func() {
@@ -79,15 +46,13 @@ and why the sea is boiling hot
 			Rows: 4, Cols: 38,
 		})
 
-		cells := flushToCells(box, 38, 4)
-		Expect(cells).To(Equal(basicCells(
+		Expect(box).To(DisplayLike(38, 4,
 			// NB: whitespace is significant here
 			"of shoes, and ships, and sealing wax, "+
 			"    of cabbages, and kings,           "+
 			"and why the sea is boiling hot        "+
-			"    and whether pigs have wings.      ",
-			tcell.StyleDefault, 0)))
-		
+			"    and whether pigs have wings.      "))
+
 	})
 
 	PIt("should handle tabs properly, accounting for cursor movement properly", func() {
@@ -102,11 +67,11 @@ and why the sea is boiling hot
 		box.SetBox(term.PositionBox{
 			Rows: 1, Cols: 8,
 		})
-		cells := flushToCells(box, 8, 1)
 
-		Expect(cells).To(Equal(append(
-			basicCells("but ", tcell.StyleDefault.Foreground(tcell.ColorBlue), 0),
-			basicCells("wait", tcell.StyleDefault.Foreground(tcell.ColorRed), 0)...)))
+		Expect(box).To(DisplayWithStyle(8, 1,
+			"but ", tcell.StyleDefault.Foreground(tcell.ColorBlue),
+			"wait ", tcell.StyleDefault.Foreground(tcell.ColorRed),
+		))
 	})
 
 	It("should wrap lines that are longer than the width", func() {
@@ -115,9 +80,7 @@ and why the sea is boiling hot
 
 		By("using a box that's smaller than the screen, so that we can see the wrapping in the output")
 		box.SetBox(term.PositionBox{Rows: 2, Cols: 25})
-		cells := flushToCells(box, 30, 2)
-
-		Expect(cells).To(Equal(basicCells("a bit, the oysters cried,      before we have our chat", tcell.StyleDefault, 60)))
+		Expect(box).To(DisplayLike(30, 2, "a bit, the oysters cried,      before we have our chat"))
 	})
 
 	It("should scroll if the contents are too large for the box", func() {
@@ -126,9 +89,7 @@ and why the sea is boiling hot
 
 		By("using a box that's smaller than the screen, so that we can see the wrapping in the output")
 		box.SetBox(term.PositionBox{Rows: 2, Cols: 29})
-		cells := flushToCells(box, 32, 3)
-
-		Expect(cells).To(Equal(basicCells("you're ready, oysters dear, w   e can begin to feed.", tcell.StyleDefault, 96)))
+		Expect(box).To(DisplayLike(32, 3, "you're ready, oysters dear, w   e can begin to feed."))
 	})
 
 	It("should properly wrap even if the box changes size", func() {
@@ -137,19 +98,19 @@ and why the sea is boiling hot
 
 		By("setting a initial size with no wrapping")
 		box.SetBox(term.PositionBox{Rows: 1, Cols: 14})
-		Expect(flushToCells(box, 14, 1)).To(Equal(basicCells("but not on us!", tcell.StyleDefault, 14)))
+		Expect(box).To(DisplayLike(14, 1, "but not on us!"))
 
 		By("changing to a size with line wrapping")
 		box.SetBox(term.PositionBox{Rows: 4, Cols: 4})
-		Expect(flushToCells(box, 6, 4)).To(Equal(basicCells("but   not   on u  s!", tcell.StyleDefault, 24)))
+		Expect(box).To(DisplayLike(6, 4, "but   not   on u  s!"))
 	})
-	
+
 	It("should skip rendering if given zero columns", func() {
 		box := &term.TextBox{}
 		box.WriteString("the oysters cried", tcell.StyleDefault)
 
 		box.SetBox(term.PositionBox{Rows: 1, Cols: 0})
-		Expect(flushToCells(box, 1, 10)).To(Equal(basicCells("", tcell.StyleDefault, 10)))
+		Expect(box).To(DisplayLike(1, 10, ""))
 	})
 
 	It("should skip rendering if given zero rows", func() {
@@ -157,7 +118,7 @@ and why the sea is boiling hot
 		box.WriteString("turning a little blue.", tcell.StyleDefault)
 
 		box.SetBox(term.PositionBox{Rows: 0, Cols: 100})
-		Expect(flushToCells(box, 1, 10)).To(Equal(basicCells("", tcell.StyleDefault, 10)))
+		Expect(box).To(DisplayLike(1, 10, ""))
 	})
 
 	It("should start writing at the position specified by its box", func() {
@@ -169,20 +130,33 @@ and why the sea is boiling hot
 			Rows: 1, Cols: 10,
 		})
 
-		Expect(flushToCells(box, 20, 6)).To(Equal(basicCells(
+		Expect(box).To(DisplayLike(20, 6,
 			"                    "+
 			"                    "+
 			"                    "+
 			"                    "+
 			"                    "+
-			"     after          ", tcell.StyleDefault, 0)))
+			"     after          "))
 	})
 
-	PIt("should handle multi-byte-single-rune contents", func() {
+	It("should handle multi-byte-single-rune contents", func() {
+		box := &term.TextBox{}
+		box.WriteString("warning sign: \u26a0 !!", tcell.StyleDefault)
 
+		box.SetBox(term.PositionBox{Rows: 1, Cols: 20})
+		Expect(box).To(DisplayLike(20, 1, "warning sign: \u26a0 !!"))
 	})
 
-	PIt("should handle combining characters and such", func() {
+	It("should handle combining characters and such", func() {
+		box := &term.TextBox{}
+		box.WriteString("b\u0301a !!", tcell.StyleDefault)
 
+		box.SetBox(term.PositionBox{Rows: 1, Cols: 20})
+		Expect(box).To(DisplayWithCells(20, 1,
+			tcell.SimCell{Runes: []rune{'b', '\u0301'}},
+			tcell.SimCell{Runes: []rune{'a'}},
+			tcell.SimCell{Runes: []rune{' '}},
+			tcell.SimCell{Runes: []rune{'!'}},
+			tcell.SimCell{Runes: []rune{'!'}}))
 	})
 })
