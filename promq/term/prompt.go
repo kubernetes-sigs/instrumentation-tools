@@ -26,28 +26,56 @@ import (
 	"github.com/c-bata/go-prompt"
 )
 
+// screenIsh represents a "screen" with a cursor.  It's the portion
+// of the runner's screen abstraction needed by the prompt widget.
 type screenIsh interface {
 	ShowCursor(int, int)
 	HideCursor()
 	RequestRepaint()
 }
 
+// cellWriter is a go-prompt writer implementation that writes to a tcell
+// buffer.  We use this so that the prompt can be contained in a widget as part
+// of our normal rendering flow, instead of just taking over the screen like it
+// normally does.
 type cellWriter struct {
+	// NB(directxman12): unlike most other stuff, since this is involved in a
+	// persistent operation separate from the draw thread, we need to lock it,
+	// since the draw thread is free to do stuff like send us resizes while
+	// we're using our size.
+	//
+	// All operations touching the text member must be done under this lock
+	textMu sync.Mutex
+
+	// screen is our handle to the actual screen -- we use it when go-prompt
+	// wants to manipulate the cursor or request a draw.  Note that the "request
+	// a draw" is a bit out of line for how we normally do things, but go-prompt
+	// wants to own the screen, so we make this concession.
 	screen screenIsh
+
+	// startRow & startCol are the starting position on the screen for the widget.
+	// They're used to show the cursor in the right position.
 	startRow, startCol int
 
-	textWrapper
+	// text is the actual underlying textWrapper that contains the contents
+	// and current visual state (cursor, etc) for the prompt.
+	text textWrapper
 
+	// currentStyle contains the current style that go-prompt & WriteStr
+	// will use to write to the underlying textWrapper.
 	currentStyle tcell.Style
 }
 
 func (w *cellWriter) SetBox(box PositionBox) {
+	w.textMu.Lock()
+	defer w.textMu.Unlock()
+
 	w.startCol = box.StartCol
 	w.startRow = box.StartRow
-	w.rows = box.Rows
-	w.cols = box.Cols
+	w.text.rows = box.Rows
+	w.text.cols = box.Cols
 
-	w.buf.Resize(box.Cols, box.Rows)
+	w.text.buf.Resize(box.Cols, box.Rows)
 }
 
 func (w *cellWriter) WriteRaw(data []byte) {
@@ -111,6 +139,10 @@ func (w *cellWriter) SetColor(fg, bg prompt.Color, bold bool) {
 }
 
 
+// screenParser is a go-prompt parser implementation that gets input from tcell's event
+// loop (via the runner's HandleKey) and translates that to go-prompt input.  It takes
+// care to split the input up so that "special" keys (like enter) get delivered in separate
+// events, as go-prompt expects, but batches together other keys for efficiency.
 type screenParser struct {
 	size *prompt.WinSize
 	// NB(directxman12): go-prompt assumes shortcut keys and things like enter come in on their
@@ -119,12 +151,17 @@ type screenParser struct {
 	leftOvers []byte
 	mu sync.Mutex
 }
-func (screenParser) Setup() error {
+
+// these are pointers so that we don't copy the mutex,
+// which isn't a big deal here cause we're not using it,
+// but makes the race detector sad anyway
+func (*screenParser) Setup() error {
 	return nil
 }
-func (screenParser) TearDown() error {
+func (*screenParser) TearDown() error {
 	return nil
 }
+
 func (p *screenParser) GetWinSize() *prompt.WinSize {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -159,7 +196,7 @@ CollapseLoop:
 			// not a problem, but can happen theoretically if typing too fast
 			// or if we synthetically batch up input
 			if evt.Key() != tcell.KeyRune {
-				bytes := keyToBytes(evt)
+				bytes := nonRuneKeyToBytes(evt)
 				if bytes != nil {
 					p.leftOvers = bytes
 				}
@@ -203,120 +240,100 @@ func (p *screenParser) AddString(str string) {
 	}
 }
 
-func keyToBytes(evt *tcell.EventKey) []byte {
-	if evt.Key() == tcell.KeyRune {
-		// use it straight-up
-		rn := evt.Rune()
-		if rn < utf8.RuneSelf {
-			return []byte{byte(rn)}
-		}
-		var buf [utf8.UTFMax]byte
-		runeSize := utf8.EncodeRune(buf[:], rn)
-		return buf[:runeSize]
-	}
+// below are threadsafe wrappers around textWrapper
 
-
-	// otherwise, translate tcell special events back to the corresponding go-prompt keys
-	key := prompt.NotDefined
-
-	// TODO: this is a bit lazy -- if tcell or go-prompt re-arranges constants, this'll break
-	rawKey := evt.Key()
-
-	// easy ranges
-	switch {
-	case rawKey >= tcell.KeyCtrlA && rawKey <= tcell.KeyCtrlZ:
-		key = prompt.Key(rawKey - tcell.KeyCtrlA + 1 /* 0 is prompt.Escape */)
-	case rawKey >= tcell.KeyF1 && rawKey <= tcell.KeyF24:
-		key = prompt.Key(rawKey - tcell.KeyF1) + prompt.F1
-	}
-
-	// direct equivalents without easy ranges
-	// NB(sollyross): these go after the ranges because some aliases (tab and escape)
-	// are the same key in tcell, but treated differently by go-prompt
-	switch rawKey {
-	case tcell.KeyTab:
-		key = prompt.Tab
-	case tcell.KeyCtrlSpace:
-		key = prompt.ControlSpace
-	case tcell.KeyCtrlBackslash:
-		key = prompt.ControlBackslash
-	case tcell.KeyCtrlRightSq:
-		key = prompt.ControlSquareClose
-	case tcell.KeyESC:
-		key = prompt.Escape
-	case tcell.KeyCtrlCarat:
-		key = prompt.ControlCircumflex
-	case tcell.KeyCtrlUnderscore:
-		key = prompt.ControlUnderscore
-	case tcell.KeyHome:
-		key = prompt.Home
-	case tcell.KeyEnd:
-		key = prompt.End
-	case tcell.KeyPgUp:
-		key = prompt.PageUp
-	case tcell.KeyPgDn:
-		key = prompt.PageDown
-	case tcell.KeyBacktab:
-		key = prompt.BackTab
-	case tcell.KeyInsert:
-		key = prompt.Insert
-	case tcell.KeyBackspace, tcell.KeyBackspace2:
-		key = prompt.Backspace
-	}
-
-	modKey := evt.Modifiers()
-	isCtrl := modKey&tcell.ModCtrl != 0
-	isShift := modKey&tcell.ModShift != 0
-
-	// ones where different modifiers affect keys
-	switch rawKey {
-	case tcell.KeyLeft:
-		key = prompt.Left
-		switch {
-		case isCtrl:
-			key = prompt.ControlLeft
-		case isShift:
-			key = prompt.ShiftLeft
-		}
-	case tcell.KeyRight:
-		key = prompt.Right
-		switch {
-		case isCtrl:
-			key = prompt.ControlRight
-		case isShift:
-			key = prompt.ShiftRight
-		}
-	case tcell.KeyUp:
-		key = prompt.Up
-		switch {
-		case isCtrl:
-			key = prompt.ControlUp
-		case isShift:
-			key = prompt.ShiftUp
-		}
-	case tcell.KeyDown:
-		key = prompt.Down
-		switch {
-		case isCtrl:
-			key = prompt.ControlDown
-		case isShift:
-			key = prompt.ShiftDown
-		}
-	case tcell.KeyDelete:
-		key = prompt.Delete
-		switch {
-		case isCtrl:
-			key = prompt.ControlDelete
-		case isShift:
-			key = prompt.ShiftDelete
-		}
-	}
-	// this is hillariously inefficient since go-prompt immediately reverses
-	// it, but it's what we're stuck with
-	for _, seq := range prompt.ASCIISequences {
-		if seq.Key == key {
-			return seq.ASCIICode
-		}
-	}
-	return nil
+func (t *cellWriter) Resize(cols, rows int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.Resize(cols, rows)
+}
+func (t *cellWriter) Reset() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.Reset()
+}
+func (t *cellWriter) Newline() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.Newline()
+}
+func (t *cellWriter) WriteString(str string, sty tcell.Style) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.WriteString(str, sty)
+}
+func (t *cellWriter) FlushTo(screen tcell.Screen, startCol, startRow int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.FlushTo(screen, startCol, startRow)
+}
+func (t *cellWriter) ScrollDown() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.ScrollDown()
+}
+func (t *cellWriter) ScrollUp() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.ScrollUp()
+}
+func (t *cellWriter) Erase() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.Erase()
+}
+func (t *cellWriter) EraseUp() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.EraseUp()
+}
+func (t *cellWriter) EraseDown() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.EraseDown()
+}
+func (t *cellWriter) EraseStartOfLine() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.EraseStartOfLine()
+}
+func (t *cellWriter) EraseEndOfLine() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.EraseEndOfLine()
+}
+func (t *cellWriter) EraseLine() {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.EraseLine()
+}
+func (t *cellWriter) CursorForward(n int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.CursorForward(n)
+}
+func (t *cellWriter) CursorBackward(n int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.CursorBackward(n)
+}
+func (t *cellWriter) CursorPosition() (col, row int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	return t.text.CursorPosition()
+}
+func (t *cellWriter) CursorGoTo(row, col int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.CursorGoTo(row, col)
+}
+func (t *cellWriter) CursorDown(n int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.CursorDown(n)
+}
+func (t *cellWriter) CursorUp(n int) {
+	t.textMu.Lock()
+	defer t.textMu.Unlock()
+	t.text.CursorUp(n)
 }
