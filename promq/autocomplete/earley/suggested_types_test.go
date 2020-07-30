@@ -139,9 +139,9 @@ func TestSuggestedTypes(t *testing.T) {
 			name:        "Binary Expression - vector binary with set operation",
 			inputString: "foo and bar",
 			expectedTypesFromParsePosMap: map[int][]TokenType{
-				1: {ARITHMETIC, COMPARISION, SET, OFFSET_KW, LEFT_BRACKET, LEFT_BRACE, LEFT_PAREN, EOF},
+				1: {ARITHMETIC, COMPARISION, SET, OFFSET_KW, LEFT_BRACKET, LEFT_BRACE, EOF},
 				2: {NUM, METRIC_ID, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, GROUP_KW, LEFT_PAREN},
-				3: {OFFSET_KW, LEFT_PAREN, LEFT_BRACE, LEFT_BRACKET, SET, COMPARISION, ARITHMETIC, EOF},
+				3: {OFFSET_KW, LEFT_BRACE, LEFT_BRACKET, SET, COMPARISION, ARITHMETIC, EOF},
 			},
 		},
 		{
@@ -154,7 +154,7 @@ func TestSuggestedTypes(t *testing.T) {
 				5: {COMMA, RIGHT_PAREN},
 				6: {RIGHT_PAREN, METRIC_LABEL_SUBTYPE},
 				7: {GROUP_SIDE, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
-				8: {SET, OFFSET_KW, LEFT_PAREN, LEFT_BRACKET, LEFT_BRACE, COMPARISION, ARITHMETIC, EOF},
+				8: {SET, OFFSET_KW, LEFT_BRACKET, LEFT_BRACE, COMPARISION, ARITHMETIC, EOF},
 			},
 		},
 		{
@@ -162,7 +162,7 @@ func TestSuggestedTypes(t *testing.T) {
 			inputString: "foo and on(test,) bar",
 			expectedTypesFromParsePosMap: map[int][]TokenType{
 				7: {NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
-				8: {SET, OFFSET_KW, LEFT_PAREN, LEFT_BRACKET, LEFT_BRACE, COMPARISION, ARITHMETIC, EOF},
+				8: {SET, OFFSET_KW, LEFT_BRACE, LEFT_BRACKET, COMPARISION, ARITHMETIC, EOF},
 			},
 		},
 		{
@@ -172,17 +172,17 @@ func TestSuggestedTypes(t *testing.T) {
 				8:  {GROUP_SIDE, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
 				9:  {LEFT_PAREN, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP},
 				10: {METRIC_LABEL_SUBTYPE, RIGHT_PAREN, NUM, METRIC_ID, LEFT_PAREN, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, UNARY_OP},
-				11: {COMMA, RIGHT_PAREN, OFFSET_KW, LEFT_PAREN, COMPARISION, ARITHMETIC, LEFT_BRACE, SET},
+				11: {COMMA, RIGHT_PAREN, OFFSET_KW, COMPARISION, ARITHMETIC, LEFT_BRACE, SET},
 				12: {METRIC_LABEL_SUBTYPE, RIGHT_PAREN},
 				13: {NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
-				14: {SET, OFFSET_KW, LEFT_PAREN, LEFT_BRACKET, LEFT_BRACE, COMPARISION, ARITHMETIC, EOF},
+				14: {SET, OFFSET_KW, LEFT_BRACKET, LEFT_BRACE, COMPARISION, ARITHMETIC, EOF},
 			},
 		},
 		{
 			name:        "Metric Expression - with labels",
 			inputString: "metric_name{label1='foo', label2='bar'}",
 			expectedTypesFromParsePosMap: map[int][]TokenType{
-				1:  {EOF, LEFT_BRACE, OFFSET_KW, LEFT_BRACKET, LEFT_PAREN, COMPARISION, ARITHMETIC, SET},
+				1:  {EOF, LEFT_BRACE, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
 				2:  {METRIC_LABEL_SUBTYPE},
 				3:  {LABELMATCH},
 				4:  {STRING},
@@ -227,7 +227,7 @@ func TestSuggestedTypes(t *testing.T) {
 			expectedTypesFromParsePosMap: map[int][]TokenType{
 				1: {AGGR_KW, LEFT_PAREN},
 				2: {METRIC_ID, NUM, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
-				3: {RIGHT_PAREN, LEFT_BRACE, OFFSET_KW, LEFT_PAREN, COMPARISION, ARITHMETIC, SET},
+				3: {RIGHT_PAREN, LEFT_BRACE, OFFSET_KW, COMPARISION, ARITHMETIC, SET},
 				4: {AGGR_KW, EOF, COMPARISION, ARITHMETIC, LEFT_BRACKET, SET},
 			},
 		},
@@ -272,7 +272,7 @@ func TestSuggestedTypes(t *testing.T) {
 			inputString: "scalar(metricname)",
 			expectedTypesFromParsePosMap: map[int][]TokenType{
 				2: {RIGHT_PAREN, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
-				3: {OFFSET_KW, LEFT_PAREN, RIGHT_PAREN, LEFT_BRACE, COMPARISION, ARITHMETIC, SET},
+				3: {OFFSET_KW, RIGHT_PAREN, LEFT_BRACE, COMPARISION, ARITHMETIC, SET},
 				4: {EOF, ARITHMETIC, COMPARISION},
 			},
 		},
@@ -280,6 +280,7 @@ func TestSuggestedTypes(t *testing.T) {
 			name:        "Function expression - have expression as arg",
 			inputString: "floor(metricname{foo!='bar'})",
 			expectedTypesFromParsePosMap: map[int][]TokenType{
+				1: {LEFT_PAREN},
 				8: {RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
 				9: {EOF, LEFT_BRACKET, COMPARISION, ARITHMETIC, SET},
 			},
@@ -296,7 +297,7 @@ func TestSuggestedTypes(t *testing.T) {
 			name:        "Function expression - have multiple args",
 			inputString: "round(metricname, -5)",
 			expectedTypesFromParsePosMap: map[int][]TokenType{
-				3: {RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, LEFT_PAREN, LEFT_BRACE, COMPARISION, ARITHMETIC, SET},
+				3: {RIGHT_PAREN, COMMA, OFFSET_KW, LEFT_BRACKET, LEFT_BRACE, COMPARISION, ARITHMETIC, SET},
 				4: {METRIC_ID, NUM, AGGR_OP, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, LEFT_PAREN, UNARY_OP},
 				5: {METRIC_ID, NUM, AGGR_OP, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, LEFT_PAREN},
 				6: {RIGHT_PAREN, COMMA, COMPARISION, ARITHMETIC},
@@ -370,7 +371,7 @@ func TestSuggestedTypes(t *testing.T) {
 				1:  {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
 				11: {RIGHT_PAREN, SET, ARITHMETIC, COMPARISION},
 				12: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, GROUP_KW},
-				13: {OFFSET_KW, LEFT_BRACE, LEFT_PAREN, COMPARISION, SET, ARITHMETIC, RIGHT_PAREN},
+				13: {OFFSET_KW, LEFT_BRACE, COMPARISION, SET, ARITHMETIC, RIGHT_PAREN},
 				14: {EOF, LEFT_BRACKET, COMPARISION, SET, ARITHMETIC},
 				15: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, GROUP_KW},
 				16: {EOF, COMPARISION, SET, ARITHMETIC, LEFT_BRACKET},
@@ -395,7 +396,7 @@ func TestSuggestedTypes(t *testing.T) {
 			expectedTypesFromParsePosMap: map[int][]TokenType{
 				0: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN, UNARY_OP},
 				1: {METRIC_ID, NUM, AGGR_OP, FUNCTION_SCALAR_ID, FUNCTION_VECTOR_ID, LEFT_PAREN},
-				2: {EOF, ARITHMETIC, COMPARISION, SET, LEFT_PAREN, LEFT_BRACE, OFFSET_KW},
+				2: {EOF, ARITHMETIC, COMPARISION, SET, LEFT_BRACE, OFFSET_KW},
 			},
 		},
 	}
@@ -429,7 +430,7 @@ func TestPartialParse(t *testing.T) {
 			"new input is same as previous input",
 			"sum(metric_name_one",
 			"sum(metric_name_one",
-			[]TokenType{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW, COMPARISION, ARITHMETIC, LEFT_PAREN, SET},
+			[]TokenType{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW, COMPARISION, ARITHMETIC, SET},
 		},
 		{
 			"new input is empty",
@@ -441,13 +442,13 @@ func TestPartialParse(t *testing.T) {
 			"previous input is empty",
 			"",
 			"sum(metric_name_one",
-			[]TokenType{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW, COMPARISION, ARITHMETIC, LEFT_PAREN, SET},
+			[]TokenType{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW, COMPARISION, ARITHMETIC, SET},
 		},
 		{
 			"previous input and new input are different from beginning",
 			"metric_name{label=",
 			"sum(metric_name_one",
-			[]TokenType{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW, COMPARISION, ARITHMETIC, LEFT_PAREN, SET},
+			[]TokenType{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW, COMPARISION, ARITHMETIC, SET},
 		},
 		{
 			"previous input and new input are partially same",
@@ -465,7 +466,7 @@ func TestPartialParse(t *testing.T) {
 			"previous input covers new input",
 			"sum(metric_name_one{",
 			"sum(metric_name_one",
-			[]TokenType{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW, COMPARISION, ARITHMETIC, LEFT_PAREN, SET},
+			[]TokenType{RIGHT_PAREN, LEFT_BRACE, OFFSET_KW, COMPARISION, ARITHMETIC, SET},
 		},
 	}
 

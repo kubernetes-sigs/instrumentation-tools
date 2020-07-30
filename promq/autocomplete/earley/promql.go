@@ -61,8 +61,8 @@ var (
 	Identifier               = NewTerminal(ID)                                  // this one is ambiguous
 	MetricIdentifier         = NewTerminalWithSubType(ID, METRIC_ID)            // this one is ambiguous
 	MetricLabelIdentifier    = NewTerminalWithSubType(ID, METRIC_LABEL_SUBTYPE) // this one is ambiguous
-	ScalarFunctionIdentifier = NewTerminalWithSubType(ID, FUNCTION_SCALAR_ID)
-	VectorFunctionIdentifier = NewTerminalWithSubType(ID, FUNCTION_VECTOR_ID)
+	ScalarFunctionIdentifier = NewTerminal(FUNCTION_SCALAR_ID)
+	VectorFunctionIdentifier = NewTerminal(FUNCTION_VECTOR_ID)
 
 	AggregatorOp     = NewTerminal(AGGR_OP)
 	AggregateKeyword = NewTerminal(AGGR_KW)
