@@ -26,12 +26,18 @@ import (
 	"github.com/c-bata/go-prompt"
 )
 
+// screenIsh represents a "screen" with a cursor.  It's the portion
+// of the runner's screen abstraction needed by the prompt widget.
 type screenIsh interface {
 	ShowCursor(int, int)
 	HideCursor()
 	RequestRepaint()
 }
 
+// cellWriter is a go-prompt writer implementation that writes to a tcell
+// buffer.  We use this so that the prompt can be contained in a widget as part
+// of our normal rendering flow, instead of just taking over the screen like it
+// normally does.
 type cellWriter struct {
 	// NB(directxman12): unlike most other stuff, since this is involved in a
 	// persistent operation separate from the draw thread, we need to lock it,
@@ -41,11 +47,22 @@ type cellWriter struct {
 	// All operations touching the text member must be done under this lock
 	textMu sync.Mutex
 
+	// screen is our handle to the actual screen -- we use it when go-prompt
+	// wants to manipulate the cursor or request a draw.  Note that the "request
+	// a draw" is a bit out of line for how we normally do things, but go-prompt
+	// wants to own the screen, so we make this concession.
 	screen screenIsh
+
+	// startRow & startCol are the starting position on the screen for the widget.
+	// They're used to show the cursor in the right position.
 	startRow, startCol int
 
+	// text is the actual underlying textWrapper that contains the contents
+	// and current visual state (cursor, etc) for the prompt.
 	text textWrapper
 
+	// currentStyle contains the current style that go-prompt & WriteStr
+	// will use to write to the underlying textWrapper.
 	currentStyle tcell.Style
 }
 
@@ -122,6 +139,10 @@ func (w *cellWriter) SetColor(fg, bg prompt.Color, bold bool) {
 }
 
 
+// screenParser is a go-prompt parser implementation that gets input from tcell's event
+// loop (via the runner's HandleKey) and translates that to go-prompt input.  It takes
+// care to split the input up so that "special" keys (like enter) get delivered in separate
+// events, as go-prompt expects, but batches together other keys for efficiency.
 type screenParser struct {
 	size *prompt.WinSize
 	// NB(directxman12): go-prompt assumes shortcut keys and things like enter come in on their
@@ -130,6 +151,7 @@ type screenParser struct {
 	leftOvers []byte
 	mu sync.Mutex
 }
+
 // these are pointers so that we don't copy the mutex,
 // which isn't a big deal here cause we're not using it,
 // but makes the race detector sad anyway

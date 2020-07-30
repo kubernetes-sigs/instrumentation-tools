@@ -23,6 +23,15 @@ import (
 	"github.com/gdamore/tcell"
 )
 
+// PromptView is a widget that displays a go-prompt prompt.  It feeds input
+// from HandleKey to go-prompt and writes output to an internal buffer that can
+// later be flushed to the screen as expected.  Since go-prompt is written
+// around having some control of the screen, unlike most widgets this one
+// should be "persistent" across updates, and the internals go to some lengths
+// to keep things threadsafe.
+//
+// Due to the internals, this widget shouldn't be used until Run is called and
+// you've received a callback to OnSetup.
 type PromptView struct {
 	writer *cellWriter
 
@@ -33,8 +42,17 @@ type PromptView struct {
 
 	pos PositionBox
 
+	// SetupPrompt initializes the go-prompt prompt each time it requests new
+	// input.
 	SetupPrompt func(requiredOpts ...prompt.Option) *prompt.Prompt
+	// HandleInput is called when the prompt returns with an entered command or whatnot.
+	// Returned text is written before displaying a new prompt, and stop can be used to
+	// indicate that even event loop should be stopped and the screen shut down (e.g. an
+	// exit command).
 	HandleInput func(input string) (text *string, stop bool)
+	// OnSetup is called during Run once the reader and writer are initialized.  It's
+	// useful for avoiding races when adding this to be displayed -- you shouldn't try
+	// to use this for displaying until OnSetup has been called.
 	OnSetup func()
 }
 
@@ -53,10 +71,17 @@ func (v *PromptView) SetBox(box PositionBox) {
 func (v *PromptView) FlushTo(screen tcell.Screen) {
 	v.writer.FlushTo(screen, v.pos.StartCol, v.pos.StartRow)
 }
+
+// HandleKey receives key events from an input loop.  Use this as the runner's
+// KeyHandler.
 func (v *PromptView) HandleKey(evt *tcell.EventKey) {
 	v.reader.AddKey(evt)
 }
 
+// Run starts the go-prompt even loop, repeatedly asking the user for input, handling the input
+// and dispatching the result to HandleInput.  If given, initial input is prepopulated into the
+// prompt followed by a synthetic "enter" event.  shutdownScreen will be called when HandleInput
+// asks for to be stopped.  It's generally the Runner's context's cancel function.
 func (v *PromptView) Run(ctx context.Context, initialInput *string, shutdownScreen func()) error {
 	v.writer = &cellWriter{
 		screen: v.Screen,

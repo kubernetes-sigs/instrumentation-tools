@@ -27,6 +27,8 @@ import (
 	"sigs.k8s.io/instrumentation-tools/promq/term"
 )
 
+// oneRuneView is a view that writes a single rune ('*' by default) to
+// the top left corner of its position box.  It's threadsafe.
 type oneRuneView struct {
 	pos term.PositionBox
 	targetRune rune

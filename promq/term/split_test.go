@@ -24,6 +24,8 @@ import (
     "sigs.k8s.io/instrumentation-tools/promq/term"
 )
 
+// flushableTestView is effectively a StaticResizable that just
+// remembers the screen it was flushed to.
 type flushableTestView struct {
 	term.StaticResizable
 	FlushedTo tcell.Screen

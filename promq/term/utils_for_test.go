@@ -27,15 +27,23 @@ import (
 	"sigs.k8s.io/instrumentation-tools/promq/term"
 )
 
+// cellsMatcher is a Ginkgo matcher that matches expected screen contents
+// against an actual tcell.Screen.  It can either match cells exactly, or only
+// their contents, ignoring style.
 type cellsMatcher struct {
 	expected tcell.SimulationScreen
 	contentsOnly bool
 }
+// onScreenAsCells takes a flushable, writes it to a fake screen that's the
+// same size as the expected screen, and then extracts the screen's contents. 
 func (m *cellsMatcher) onScreenAsCells(contents term.Flushable) []tcell.SimCell {
 	screen := m.onScreen(contents)
 	cells, _, _ := screen.GetContents()
 	return cells
 }
+
+// onScreen takes a flushable, writes it to a fake screen that's the same
+// size as the expected screen, and then returns that fake screen.
 func (m *cellsMatcher) onScreen(contents term.Flushable) tcell.SimulationScreen {
 	screen := tcell.NewSimulationScreen("")
 	screen.Init()
@@ -46,6 +54,8 @@ func (m *cellsMatcher) onScreen(contents term.Flushable) tcell.SimulationScreen 
 	return screen
 }
 
+// matchWithContents checks if the given cells match match the expected cells (potentially
+// considering style, if this matcher was asked to), returning true if so and false if not.
 func (m *cellsMatcher) matchWithContents(actualCells []tcell.SimCell) (bool, error) {
 	expectedCells, _, _ := m.expected.GetContents()
 
@@ -64,6 +74,7 @@ func (m *cellsMatcher) matchWithContents(actualCells []tcell.SimCell) (bool, err
 
 	return reflect.DeepEqual(expectedRunes, actualRunes), nil
 }
+
 func (m *cellsMatcher) Match(actual interface{}) (bool, error) {
 	if m.expected == nil && actual == nil {
 		return false, fmt.Errorf("Refusing to compare <nil> to <nnil>")
@@ -173,6 +184,11 @@ func displayCells(screen tcell.SimulationScreen) string {
 // DisplayLike matches the given string to the contents to the actual screen,
 // ignoring styling.  It doesn't handle multi-rune or large-width sequences
 // properly in the expected string currently.
+//
+// "actual" can be a tcell.Screen or LockableScreen (in which case
+// we'll match the expected contents against the screen), or it can be
+// a Flushable, in which case we'll render it to a fake screen
+// first before comparing it with the expected contents.
 func DisplayLike(width, height int, text string) types.GomegaMatcher {
 	expected := tcell.NewSimulationScreen("")
 	expected.Init()
@@ -194,6 +210,18 @@ func DisplayLike(width, height int, text string) types.GomegaMatcher {
 	return &cellsMatcher{expected: expected, contentsOnly: true}
 }
 
+// DisplayWithStyle matches the given (text, style) pairs against the actual
+// screen (taking styling into account).  It otherwise functions identically
+// to DisplayLike.
+//
+// For each given pair, we use the given style to write the given text.  For instance,
+//
+//   DisplayWithStyle(10, 1,
+//     "red", tcell.DefaultStyle.Foreground(tcell.ColorRed),
+//     "blue", tcell.DefaultStyle.Foreground(tcell.ColorBlue),
+//   )
+//
+// writes the word red in red, followed by the word blue in blue.
 func DisplayWithStyle(width, height int, pairs ...interface{}) types.GomegaMatcher {
 	if len(pairs) % 2 != 0 {
 		panic("DisplayWithStyle expects pairs of (text, style)")
@@ -240,6 +268,9 @@ func DisplayWithStyle(width, height int, pairs ...interface{}) types.GomegaMatch
 	return &cellsMatcher{expected: expected}
 }
 
+// DisplayWithCells checks that the given cells, when interpretted as the
+// contents of a screen of the given size, match the actual screen.  Think of
+// this like a low-level version of DisplayWithStyle or DisplayLike.
 func DisplayWithCells(width, height int, cells ...tcell.SimCell) types.GomegaMatcher {
 	expected := tcell.NewSimulationScreen("")
 	expected.Init()
@@ -261,6 +292,9 @@ func DisplayWithCells(width, height int, cells ...tcell.SimCell) types.GomegaMat
 	return &cellsMatcher{expected: expected}
 }
 
+// LockableScreen is an object that contains a screen that can only be accessed
+// inside a callback that ensures a lock is held.  Useful for testing screens
+// being accessed from a different location in the background.
 type LockableScreen interface {
 	WithScreen(func(tcell.SimulationScreen))
 }

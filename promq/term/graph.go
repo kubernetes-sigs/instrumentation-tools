@@ -21,6 +21,9 @@ import (
 	"github.com/gdamore/tcell"
 )
 
+// GraphView is a widget that displays the given graph with on the screen.  You
+// *must* supply a domain and range labeler.  Default spacings will be chosen
+// for the tick spacing if not specified.
 type GraphView struct {
 	pos PositionBox
 
@@ -52,6 +55,8 @@ func (g *GraphView) FlushTo(screen tcell.Screen) {
 		domainSpacing = 10
 	}
 
+	// calculate the axes, to figure out the "inner" size (columns and rows available for the plot
+	// itself once we taking drawing the axis labels & ticks into account)...
 	screenSize := plot.ScreenSize{Cols: plot.Column(g.pos.Cols), Rows: plot.Row(g.pos.Rows)}
 	scale := func(p float64) float64 { return p }
 	axes := plot.EvenlySpacedTicks(g.Graph, screenSize, plot.TickScaling{
@@ -93,6 +98,7 @@ func (g *GraphView) FlushTo(screen tcell.Screen) {
 
 	})
 
+	// ... and use that "inner" size as the space for the plot itself.
 	screenGraph := g.Graph.ToScreen(scale, plot.BrailleCellScreenSize(axes.InnerGraphSize))
 	renderedGraph := screenGraph.Render(plot.BrailleCellMapper)
 
