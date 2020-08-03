@@ -109,7 +109,7 @@ func (p *Earley) complete(state *EarleyItem, chartIndex int) {
 
 	for _, item := range itemsToComplete {
 		fromItems := []ItemId{state.id, item.id}
-		nextItem := newCompleteItem(&item, fromItems)
+		nextItem := newCompleteItem(&item, fromItems, state.ctx)
 		if currStateSet.Add(nextItem) {
 			debug.Debugf("completed %v\n", nextItem.String())
 		}
@@ -206,7 +206,7 @@ func (p *Earley) GetSuggestedTokenType(tokens Tokens) (types []ContextualToken) 
 			// No further parsing needed if input tokens is exactly the previous input
 		}
 	}
-
+	//fmt.Println(p.chart.String())
 	suggestions := p.chart.GetValidTerminalTypesAtStateSet(lastTokenPos)
 	debug.Debugln(
 		"generating suggestions", tokens.Vals()[lastTokenPos], len(tokens), lastTokenPos, len(suggestions))

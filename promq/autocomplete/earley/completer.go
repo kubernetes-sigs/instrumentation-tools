@@ -26,8 +26,8 @@ import (
 	"sigs.k8s.io/instrumentation-tools/promq/autocomplete"
 )
 
-const (
-	PromQLTokenSeparators = " []{}()=!~,"
+var (
+	PromQLTokenSeparators = " []{}()+-*/%^=!><~"
 )
 
 type matchResult struct {
@@ -97,8 +97,8 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 	suggestions := PromQLParser.GetSuggestedTokenType(tokens)
 
 	for _, s := range suggestions {
-		switch s.TokenType {
-		case METRIC_LABEL_SUBTYPE:
+		switch {
+		case s.TokenType == METRIC_LABEL_SUBTYPE:
 			if s.ctx.HasMetric() {
 				metricName := s.ctx.GetMetric()
 				for _, d := range autocomplete.FilterPrefix(c.GetStoredDimensionsForMetric(metricName), autocompletePrefix, false).List() {
@@ -107,14 +107,14 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 					matches = append(matches, newMatch)
 				}
 			}
-		case METRIC_ID:
+		case s.TokenType == METRIC_ID:
 			metricMatches := autocomplete.FilterPrefix(c.GetMetricNames(), autocompletePrefix, false)
 			for _, m := range metricMatches.List() {
 				dims := c.GetStoredDimensionsForMetric(m).List()
 				newMatch := NewPartialMatch(m, "metric-id", strings.Join(dims, ","))
 				matches = append(matches, newMatch)
 			}
-		case STRING:
+		case s.TokenType == STRING:
 			if s.ctx.HasMetric() && s.ctx.HasMetricLabel() {
 				for _, m := range autocomplete.FilterPrefix(c.GetStoredValuesForMetricAndDimension(s.ctx.GetMetric(), s.ctx.GetMetricLabel()), autocompletePrefix, false).List() {
 					dims := c.GetStoredDimensionsForMetric(m).List()
@@ -122,56 +122,7 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 					matches = append(matches, newMatch)
 				}
 			}
-		case AGGR_OP:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(aggregators), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "aggr-operation", aggregators[ao])
-				matches = append(matches, newMatch)
-			}
-		case AGGR_KW:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(aggregateKeywords), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "aggr-keyword", aggregateKeywords[ao])
-				matches = append(matches, newMatch)
-			}
-		case ARITHMETIC:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(arithmeticOperators), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "arithmetic", arithmeticOperators[ao])
-				matches = append(matches, newMatch)
-			}
-		case COMPARISION:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(comparisionOperators), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "comparision", comparisionOperators[ao])
-				matches = append(matches, newMatch)
-			}
-		case SET:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(setOperators), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "logical", setOperators[ao])
-				matches = append(matches, newMatch)
-			}
-		case LABELMATCH:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(labelMatchOperators), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "label-match", labelMatchOperators[ao])
-				matches = append(matches, newMatch)
-			}
-		case UNARY_OP:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(unaryOperators), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "unary", unaryOperators[ao])
-				matches = append(matches, newMatch)
-			}
-		case OFFSET_KW:
-			matches = append(matches, NewPartialMatch("offset", "keyword", keywords["offset"]))
-		case BOOL_KW:
-			matches = append(matches, NewPartialMatch("bool", "keyword", keywords["bool"]))
-		case GROUP_SIDE:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(groupSideKeywords), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "keyword", groupSideKeywords[ao])
-				matches = append(matches, newMatch)
-			}
-		case GROUP_KW:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(groupKeywords), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "keyword", groupKeywords[ao])
-				matches = append(matches, newMatch)
-			}
-		case DURATION:
+		case s.TokenType == DURATION:
 			// add time units to match is the prefix is number
 			if _, err := strconv.Atoi(autocompletePrefix); err == nil {
 				for _, ao := range sets.StringKeySet(timeUnits).List() {
@@ -179,14 +130,10 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 					matches = append(matches, newMatch)
 				}
 			}
-		case FUNCTION_VECTOR_ID:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(vectorFunctions), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "label-match", vectorFunctions[ao])
-				matches = append(matches, newMatch)
-			}
-		case FUNCTION_SCALAR_ID:
-			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(scalarFunctions), autocompletePrefix, false).List() {
-				newMatch := NewPartialMatch(ao, "label-match", scalarFunctions[ao])
+		case newStringSet(tokenTypes...).Has(string(s.TokenType)):
+			mapping := tokenTypeMatching[s.TokenType]
+			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(mapping), autocompletePrefix, false).List() {
+				newMatch := NewPartialMatch(ao, string(s.TokenType), mapping[ao])
 				matches = append(matches, newMatch)
 			}
 		}

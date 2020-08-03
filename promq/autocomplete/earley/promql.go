@@ -236,14 +236,16 @@ var (
 		"quantile":     "calculate φ-quantile (0 ≤ φ ≤ 1) over dimensions",
 	}
 
-	// Todo:(yuchen) add the description for keywords
 	aggregateKeywords = map[string]string{
 		"by":      "keep the listed labels and drop the labels that are not listed in the clause",
 		"without": "remove the listed labels from the result vector",
 	}
-	keywords = map[string]string{
-		"bool":   "if provided, return 0 or 1 for the value rather than filtering",
+	offsetKeyword = map[string]string{
 		"offset": "allow changing the time offset for individual instant and range vectors in a query",
+	}
+
+	boolKeyword = map[string]string{
+		"bool": "if provided, return 0 or 1 for the value rather than filtering",
 	}
 
 	groupKeywords = map[string]string{
@@ -352,5 +354,24 @@ var (
 		"timestamp":          "timestamp(v instant-vector) returns the timestamp of each of the samples of the given vector as the number of seconds",
 		"vector":             "vector(s scalar) returns the scalar s as a vector with no labels",
 		"year":               "year(v=vector(time()) instant-vector) returns the year for each of the given times in UTC",
+	}
+
+	tokenTypeMatching = map[TokenType]map[string]string{
+		AGGR_OP:            aggregators,
+		AGGR_KW:            aggregateKeywords,
+		ARITHMETIC:         arithmeticOperators,
+		COMPARISION:        comparisionOperators,
+		SET:                setOperators,
+		LABELMATCH:         labelMatchOperators,
+		UNARY_OP:           unaryOperators,
+		OFFSET_KW:          offsetKeyword,
+		BOOL_KW:            boolKeyword,
+		GROUP_SIDE:         groupSideKeywords,
+		GROUP_KW:           groupKeywords,
+		FUNCTION_VECTOR_ID: vectorFunctions,
+		FUNCTION_SCALAR_ID: scalarFunctions,
+	}
+	tokenTypes = []TokenType{
+		AGGR_OP, AGGR_KW, ARITHMETIC, COMPARISION, SET, LABELMATCH, UNARY_OP, OFFSET_KW, BOOL_KW, GROUP_SIDE, GROUP_KW, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID,
 	}
 )
