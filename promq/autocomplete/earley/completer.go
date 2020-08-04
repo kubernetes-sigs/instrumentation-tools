@@ -27,7 +27,7 @@ import (
 )
 
 var (
-	PromQLTokenSeparators = " []{}()+-*/%^=!><~"
+	PromQLTokenSeparators = " []{}()+-*/%^=!><~,"
 )
 
 type matchResult struct {
@@ -124,6 +124,9 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 			}
 		case s.TokenType == DURATION:
 			// add time units to match is the prefix is number
+			if autocompletePrefix == "" {
+				continue
+			}
 			if _, err := strconv.Atoi(autocompletePrefix); err == nil {
 				for _, ao := range sets.StringKeySet(timeUnits).List() {
 					newMatch := NewPartialMatch(ao, "time-unit", timeUnits[ao])

@@ -41,6 +41,27 @@ type completionContext struct {
 	metricLabelValues sets.String
 }
 
+func Copy(c *completionContext) *completionContext {
+	if c == nil {
+		return nil
+	}
+	cc := completionContext{}
+	if c.metric != nil {
+		cc.metric = proto.String(*c.metric)
+	}
+	if c.metricLabel != nil {
+		cc.metricLabel = proto.String(*c.metricLabel)
+	}
+	if c.metricLabelValues != nil {
+		ss := sets.String{}
+		for v := range c.metricLabelValues {
+			ss.Insert(v)
+		}
+		cc.metricLabelValues = ss
+	}
+	return &cc
+}
+
 // Build context with input token
 func (c *completionContext) BuildContext(tokenType *TokenType, token *Tokhan) {
 	switch *tokenType {

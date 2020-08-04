@@ -72,7 +72,8 @@ func (p *Earley) predict(state *EarleyItem, chartIndex int, fromItems []ItemId) 
 	}
 	// Find all the rules for the Symbol put those rules to the current set
 	for _, r := range recognizedRules {
-		nextItem := newPredictItem(r, chartIndex, fromItems, state.ctx)
+		ctx := Copy(state.ctx)
+		nextItem := newPredictItem(r, chartIndex, fromItems, ctx)
 		if currStateSet.Add(nextItem) {
 			debug.Debugf("added %v\n", nextItem.String())
 		}
@@ -89,7 +90,7 @@ func (p *Earley) scan(state *EarleyItem, chartIndex int, fromItems []ItemId, tok
 	debug.Debugf("Token (%v) matches, performing scan \n", token)
 	ctx := &completionContext{}
 	if state.ctx != nil {
-		ctx = state.ctx
+		ctx = Copy(state.ctx)
 	}
 	ctx.BuildContext(state.GetRightSymbolTypeByRulePos(), &token)
 
@@ -109,7 +110,8 @@ func (p *Earley) complete(state *EarleyItem, chartIndex int) {
 
 	for _, item := range itemsToComplete {
 		fromItems := []ItemId{state.id, item.id}
-		nextItem := newCompleteItem(&item, fromItems, state.ctx)
+		ctx := Copy(state.ctx)
+		nextItem := newCompleteItem(&item, fromItems, ctx)
 		if currStateSet.Add(nextItem) {
 			debug.Debugf("completed %v\n", nextItem.String())
 		}
