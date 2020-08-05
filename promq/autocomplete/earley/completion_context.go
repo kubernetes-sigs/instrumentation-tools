@@ -41,6 +41,7 @@ type completionContext struct {
 	metricLabelValues sets.String
 }
 
+// Deep copy completionContext and return a pointer
 func Copy(c *completionContext) *completionContext {
 	if c == nil {
 		return nil

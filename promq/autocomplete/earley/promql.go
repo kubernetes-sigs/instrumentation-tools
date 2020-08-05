@@ -208,6 +208,7 @@ var (
 		// the functions that return scalar type expression: time() scalar(vector)
 		NewRule(ScalarFuncExpression, ScalarFunctionIdentifier, LParen, RParen),
 		NewRule(ScalarFuncExpression, ScalarFunctionIdentifier, LParen, VectorTypeExpression, RParen),
+		NewRule(ScalarFuncExpression, ScalarFunctionIdentifier, LParen, UnaryOperator, VectorTypeExpression, RParen),
 
 		// SUBQUERY EXPRESSIONS:
 		NewRule(SubqueryExpression, VectorTypeExpression, LBracket, Duration, Colon, RBracket),
@@ -371,7 +372,10 @@ var (
 		FUNCTION_VECTOR_ID: vectorFunctions,
 		FUNCTION_SCALAR_ID: scalarFunctions,
 	}
+
 	tokenTypes = []TokenType{
 		AGGR_OP, AGGR_KW, ARITHMETIC, COMPARISION, SET, LABELMATCH, UNARY_OP, OFFSET_KW, BOOL_KW, GROUP_SIDE, GROUP_KW, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID,
 	}
+
+	tokenTypeStringSet = newStringSet(tokenTypes...)
 )

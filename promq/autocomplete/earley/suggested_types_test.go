@@ -222,7 +222,7 @@ func TestSuggestedTypes(t *testing.T) {
 			},
 		},
 		{
-			name:        "Aggregation expression - the clause is after expression",
+			name:        "Aggregation expression - only metric",
 			inputString: "sum(metric_name)",
 			expectedTypesFromParsePosMap: map[int][]TokenType{
 				1: {AGGR_KW, LEFT_PAREN},
@@ -258,7 +258,7 @@ func TestSuggestedTypes(t *testing.T) {
 			},
 		},
 		{
-			name:        "Aggregation expression - has label list",
+			name:        "Aggregation expression - the clause is after expression",
 			inputString: "sum(metricname{label1='foo', label2='bar'}) by (label1, label2)",
 			expectedTypesFromParsePosMap: map[int][]TokenType{
 				14: {LEFT_PAREN},
@@ -271,7 +271,7 @@ func TestSuggestedTypes(t *testing.T) {
 			name:        "Function expression - scalar function",
 			inputString: "scalar(metricname)",
 			expectedTypesFromParsePosMap: map[int][]TokenType{
-				2: {RIGHT_PAREN, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN},
+				2: {RIGHT_PAREN, NUM, METRIC_ID, FUNCTION_VECTOR_ID, FUNCTION_SCALAR_ID, AGGR_OP, LEFT_PAREN, UNARY_OP},
 				3: {OFFSET_KW, RIGHT_PAREN, LEFT_BRACE, COMPARISION, ARITHMETIC, SET},
 				4: {EOF, ARITHMETIC, COMPARISION},
 			},

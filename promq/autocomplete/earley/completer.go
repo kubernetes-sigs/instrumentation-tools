@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/instrumentation-tools/promq/autocomplete"
 )
 
-var (
+const (
 	PromQLTokenSeparators = " []{}()+-*/%^=!><~,"
 )
 
@@ -127,13 +127,17 @@ func (c *promQLCompleter) GenerateSuggestions(query string, pos int) []autocompl
 			if autocompletePrefix == "" {
 				continue
 			}
+			// subquery expression has range and resolution that are split by ":"
+			if strings.Contains(autocompletePrefix, ":") {
+				autocompletePrefix = strings.Split(autocompletePrefix, ":")[1]
+			}
 			if _, err := strconv.Atoi(autocompletePrefix); err == nil {
 				for _, ao := range sets.StringKeySet(timeUnits).List() {
 					newMatch := NewPartialMatch(ao, "time-unit", timeUnits[ao])
 					matches = append(matches, newMatch)
 				}
 			}
-		case newStringSet(tokenTypes...).Has(string(s.TokenType)):
+		case tokenTypeStringSet.Has(string(s.TokenType)):
 			mapping := tokenTypeMatching[s.TokenType]
 			for _, ao := range autocomplete.FilterPrefix(sets.StringKeySet(mapping), autocompletePrefix, false).List() {
 				newMatch := NewPartialMatch(ao, string(s.TokenType), mapping[ao])

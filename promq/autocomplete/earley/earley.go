@@ -208,7 +208,6 @@ func (p *Earley) GetSuggestedTokenType(tokens Tokens) (types []ContextualToken) 
 			// No further parsing needed if input tokens is exactly the previous input
 		}
 	}
-	//fmt.Println(p.chart.String())
 	suggestions := p.chart.GetValidTerminalTypesAtStateSet(lastTokenPos)
 	debug.Debugln(
 		"generating suggestions", tokens.Vals()[lastTokenPos], len(tokens), lastTokenPos, len(suggestions))
