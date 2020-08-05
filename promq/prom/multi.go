@@ -70,6 +70,8 @@ func (q *PeriodicData) SetQuery(ctx context.Context, query string) error {
 }
 
 func (q *PeriodicData) Scrape(ctx context.Context) error {
+	q.storageMu.Lock()
+	defer q.storageMu.Unlock()
 	data, err := q.source.ScrapePrometheusEndpoint(ctx, time.Now())
 	if err != nil {
 		return fmt.Errorf("unable to get new data from source: %w", err)
@@ -78,9 +80,6 @@ func (q *PeriodicData) Scrape(ctx context.Context) error {
 		q._index.UpdateMetric(d)
 	}
 	if err := func() error {
-		q.storageMu.Lock()
-		defer q.storageMu.Unlock()
-
 		if err := q.storage.LoadData(data); err != nil {
 			return fmt.Errorf("unable to load new data, may now be in inconsistent state: %w", err)
 		}
