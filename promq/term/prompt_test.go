@@ -134,7 +134,7 @@ var _ = Describe("The Prompt widget", func() {
 			}()
 
 			// wait for setup so that it's safe to send keypresses
-			<-waitForSetup
+			Eventually(waitForSetup).Should(BeClosed(), "should be safe to send keypresses eventually")
 		})
 
 		It("should map single-byte rune key presses to key presses in the prompt, and display them", func() {
@@ -260,15 +260,15 @@ var _ = Describe("The Prompt widget", func() {
 
 	Context("when rendering", func() {
 		It("should start rendering at its box's position", func() {
+			prompt.SetBox(term.PositionBox{StartRow: 1, StartCol: 2, Rows: 7, Cols: 45})
+
 			go func() {
 				defer GinkgoRecover()
 				Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
 			}()
 
 			// wait for setup so that it's safe to send keypresses
-			<-waitForSetup
-
-			prompt.SetBox(term.PositionBox{StartRow: 1, StartCol: 2, Rows: 7, Cols: 45})
+			Eventually(waitForSetup).Should(BeClosed(), "should be safe to send keypresses eventually")
 
 			Eventually(screen).Should(DisplayLike(50, 10,
 				"                                                  "+
@@ -289,7 +289,7 @@ var _ = Describe("The Prompt widget", func() {
 			}()
 
 			// wait for setup so that it's safe to send keypresses
-			<-waitForSetup
+			Eventually(waitForSetup).Should(BeClosed(), "should be safe to send keypresses eventually")
 
 			By("using a box smaller than the screen box & marking the end manually")
 			prompt.SetBox(term.PositionBox{Cols: 40, Rows: 7})
@@ -350,7 +350,7 @@ var _ = Describe("The Prompt widget", func() {
 			}()
 
 			// wait for setup so that it's safe to send keypresses
-			<-waitForSetup
+			Eventually(waitForSetup).Should(BeClosed(), "should be safe to send keypresses eventually")
 
 			sendRuneKeys("parmesean\r", prompt)
 
@@ -393,7 +393,7 @@ var _ = Describe("The Prompt widget", func() {
 				Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
 			}()
 			// wait for setup so that it's safe to send keypresses
-			<-waitForSetup
+			Eventually(waitForSetup).Should(BeClosed(), "should be safe to send keypresses eventually")
 
 			sendRuneKeys("cheddar\r", prompt)
 			sendRuneKeys("monterey jack\r", prompt)
@@ -420,7 +420,7 @@ var _ = Describe("The Prompt widget", func() {
 				Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
 			}()
 			// wait for setup so that it's safe to send keypresses
-			<-waitForSetup
+			Eventually(waitForSetup).Should(BeClosed(), "should be safe to send keypresses eventually")
 
 			sendRuneKeys("cheddar\r", prompt)
 			sendRuneKeys("monterey jack\r", prompt)
