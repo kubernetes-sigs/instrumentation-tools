@@ -67,13 +67,13 @@ func newScanItem(sourceState *EarleyItem, index int, from []ItemId, ctx *complet
 	}
 }
 
-func newCompleteItem(sourceState *EarleyItem, from []ItemId) *EarleyItem {
+func newCompleteItem(sourceState *EarleyItem, from []ItemId, ctx *completionContext) *EarleyItem {
 	return &EarleyItem{
 		Rule:                    sourceState.Rule,
 		RulePos:                 sourceState.RulePos + 1,
 		originatingIndex:        sourceState.originatingIndex,
 		terminalSymbolsConsumed: sourceState.terminalSymbolsConsumed,
-		ctx:                     sourceState.ctx,
+		ctx:                     ctx,
 		cause:                   COMPLETE_STATE,
 		from:                    from,
 	}
