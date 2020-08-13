@@ -25,6 +25,11 @@ import (
 	"github.com/prometheus/prometheus/promql"
 )
 
+// ResultsCallback is a function that processes the results of a prometheus query
+// The given results are *only* valid for the life of the query, and must be deep-copied
+// if they are kept around.
+type ResultsCallback func(*promql.Result) error
+
 type DataSource interface {
 	ScrapePrometheusEndpoint(ctx context.Context, nowish time.Time) ([]ParsedSeries, error)
 }
@@ -42,10 +47,10 @@ type PeriodicData struct {
 	storage   *rangeStorage
 	engine    *promql.Engine
 	queryMu   sync.RWMutex
-	Callback  func(*promql.Result) error
+	Callback  ResultsCallback
 	Query     string
 	Times     Range
-	_index    Indexer
+	index    Indexer
 }
 
 func NewPeriodicData(source DataSource, opts promql.EngineOpts) *PeriodicData {
@@ -53,7 +58,7 @@ func NewPeriodicData(source DataSource, opts promql.EngineOpts) *PeriodicData {
 		source:  source,
 		storage: NewRangeStorage(),
 		engine:  promql.NewEngine(opts),
-		_index:  NewIndex(),
+		index:  NewIndex(),
 	}
 }
 
@@ -77,7 +82,7 @@ func (q *PeriodicData) Scrape(ctx context.Context) error {
 		return fmt.Errorf("unable to get new data from source: %w", err)
 	}
 	for _, d := range data {
-		q._index.UpdateMetric(d)
+		q.index.UpdateMetric(d)
 	}
 	if err := func() error {
 		if err := q.storage.LoadData(data); err != nil {
@@ -89,19 +94,19 @@ func (q *PeriodicData) Scrape(ctx context.Context) error {
 		return err
 	}
 
-	if err := q.execQuery(ctx); err != nil {
+	if err := q.ManuallyExecuteQuery(ctx, q.Callback); err != nil {
 		return fmt.Errorf("unable to execute query: %w", err)
 	}
 	return nil
 }
 
-func (q *PeriodicData) ManuallyExecuteQuery(ctx context.Context) (*promql.Result, error) {
+func (q *PeriodicData) ManuallyExecuteQuery(ctx context.Context, cb ResultsCallback) error {
 	var query promql.Query
 	if q.Times.Instant {
 		var err error
 		query, err = q.engine.NewInstantQuery(q.storage, q.Query, time.Now())
 		if err != nil {
-			return nil, fmt.Errorf("unable to construct instant query: %w", err)
+			return fmt.Errorf("unable to construct instant query: %w", err)
 		}
 	} else {
 		var err error
@@ -109,24 +114,16 @@ func (q *PeriodicData) ManuallyExecuteQuery(ctx context.Context) (*promql.Result
 		start := time.Now().Add(time.Duration(-1) * q.Times.Window)
 		query, err = q.engine.NewRangeQuery(q.storage, q.Query, start, end, q.Times.Interval)
 		if err != nil {
-			return nil, fmt.Errorf("unable to construct range query: %w", err)
+			return fmt.Errorf("unable to construct range query: %w", err)
 		}
 	}
 	defer query.Close()
-
-	return query.Exec(ctx), nil
+	// NB(directxman12): THE QUERY DATA IS ONLY VALID INSIDE THIS FUNCTION
+	return cb(query.Exec(ctx))
 }
 
 func (q *PeriodicData) GetIndex() Indexer {
-	return q._index
-}
-
-func (q *PeriodicData) execQuery(ctx context.Context) error {
-	res, err := q.ManuallyExecuteQuery(ctx)
-	if err != nil {
-		return err
-	}
-	return q.Callback(res)
+	return q.index
 }
 
 func DefaultEngineOptions(timeout time.Duration, maxSamples int) promql.EngineOpts {

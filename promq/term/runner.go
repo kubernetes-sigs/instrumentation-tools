@@ -86,7 +86,8 @@ func (r *Runner) Run(ctx context.Context, initialView View) error {
 		}
 	}
 	screen.Init()
-	defer screen.Fini()
+	// TODO(directxman12): we should probably figure out how to call Fini in a
+	// defer but before the waiting for the evtLoopDone
 
 	r.screenMu.Lock()
 	r.screen = screen
@@ -99,7 +100,10 @@ func (r *Runner) Run(ctx context.Context, initialView View) error {
 		mainView.FlushTo(screen)
 		screen.Show()
 	}
+
+	evtLoopDone := make(chan struct{})
 	go func() {
+		defer close(evtLoopDone)
 		if r.OnStart != nil {
 			r.OnStart()
 		}
@@ -139,6 +143,13 @@ func (r *Runner) Run(ctx context.Context, initialView View) error {
 	}()
 
 	<-ctx.Done()
+	screen.Fini()
+
+	// wait till the event loop finishes to actually return this is largely
+	// useful for tests to avoid leaking goroutines or accidentally mutating
+	// shared state, but technically could be useful if a program was starting
+	// and stopping event loops repeatedly
+	<-evtLoopDone
 
 	return nil
 }

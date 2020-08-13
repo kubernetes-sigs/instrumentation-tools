@@ -72,20 +72,21 @@ func sendRuneKeys(str string, pr *term.PromptView) {
 	}
 }
 
+var (
+	testCompleter = func(d goprompt.Document) []goprompt.Suggest {
+		return goprompt.FilterHasPrefix([]goprompt.Suggest{
+			{Text: "cheddar", Description: "only sharp cheddars allowed"},
+			{Text: "parmesan", Description: "you'd better not mention the powdered stuff"},
+			{Text: "pepper jack", Description: "mmm... spicy"},
+		}, d.GetWordBeforeCursor(), true)
+	}
+)
 
 var _ = Describe("The Prompt widget", func() {
 	var (
 		screen *fakeScreenish
 		prompt *term.PromptView
 		waitForSetup chan struct{}
-
-		testCompleter = func(d goprompt.Document) []goprompt.Suggest {
-			return goprompt.FilterHasPrefix([]goprompt.Suggest{
-				{Text: "cheddar", Description: "only sharp cheddars allowed"},
-				{Text: "parmesan", Description: "you'd better not mention the powdered stuff"},
-				{Text: "pepper jack", Description: "mmm... spicy"},
-			}, d.GetWordBeforeCursor(), true)
-		}
 
 		ctx context.Context
 		cancel context.CancelFunc
@@ -119,22 +120,18 @@ var _ = Describe("The Prompt widget", func() {
 
 		ctx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
 	})
-	AfterEach(func() {
-		screen.WithScreen(func(s tcell.SimulationScreen) {
-			s.Fini()
-		})
-		cancel()
-	})
 
 	Context("when translating key events into key presses", func() {
-		BeforeEach(func() {
-			go func() {
-				defer GinkgoRecover()
-				Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
-			}()
+		var waitForPrompt *promptWaiter
 
+		BeforeEach(func() {
+			waitForPrompt = runPromptInBg(ctx, prompt)
 			// wait for setup so that it's safe to send keypresses
 			Eventually(waitForSetup).Should(BeClosed(), "should be safe to send keypresses eventually")
+		})
+
+		AfterEach(func() {
+			waitForPrompt.WaitTillDone()
 		})
 
 		It("should map single-byte rune key presses to key presses in the prompt, and display them", func() {
@@ -262,10 +259,7 @@ var _ = Describe("The Prompt widget", func() {
 		It("should start rendering at its box's position", func() {
 			prompt.SetBox(term.PositionBox{StartRow: 1, StartCol: 2, Rows: 7, Cols: 45})
 
-			go func() {
-				defer GinkgoRecover()
-				Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
-			}()
+			defer runPromptInBg(ctx, prompt).WaitTillDone()
 
 			// wait for setup so that it's safe to send keypresses
 			Eventually(waitForSetup).Should(BeClosed(), "should be safe to send keypresses eventually")
@@ -279,14 +273,17 @@ var _ = Describe("The Prompt widget", func() {
 		It("should never render outside its box", func() {
 			Skip("this has a weird race that's making it flaky -- see note below")
 
+			// go-prompt eagerly consumes input then discards anything after
+			// the first \r, so wait till we get a new prompt between inputs
+			// like a real user would
+			pulse := make(chan struct{}, 10) 
 			prompt.HandleInput = func(_ string) (*string, bool) {
 				// never exit normally, just use the cancel in aftereach
+				pulse <- struct{}{}
 				return nil, false
 			}
-			go func() {
-				defer GinkgoRecover()
-				Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
-			}()
+
+			defer runPromptInBg(ctx, prompt).WaitTillDone()
 
 			// wait for setup so that it's safe to send keypresses
 			Eventually(waitForSetup).Should(BeClosed(), "should be safe to send keypresses eventually")
@@ -300,8 +297,11 @@ var _ = Describe("The Prompt widget", func() {
 
 			By("entering in a few lines of text, and checking that we scrolled")
 			sendRuneKeys("cheddar\r", prompt)
+			<-pulse
 			sendRuneKeys("pepper jack\r", prompt)
+			<-pulse
 			sendRuneKeys("monterey jack\r", prompt)
+			<-pulse
 			sendRuneKeys("wensleydale\r", prompt)
 			// TODO(directxman12): there's a *really* weird race here around
 			// the displaying of the old two lines (monterey jack &
@@ -344,10 +344,7 @@ var _ = Describe("The Prompt widget", func() {
 				return nil, true
 			}
 
-			go func() {
-				defer GinkgoRecover()
-				Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
-			}()
+			defer runPromptInBg(ctx, prompt).WaitTillDone()
 
 			// wait for setup so that it's safe to send keypresses
 			Eventually(waitForSetup).Should(BeClosed(), "should be safe to send keypresses eventually")
@@ -380,22 +377,23 @@ var _ = Describe("The Prompt widget", func() {
 
 		It("it should not display a blank line between prompts if no output is given", func() {
 			cnt := 0
+			pulse := make(chan struct{}, 10) 
 			prompt.HandleInput = func(_ string) (text *string, stop bool) {
 				cnt++
+				pulse <- struct{}{}
 				if cnt == 1 {
 					return nil, false
 				}
 				return nil, true
 			}
 
-			go func() {
-				defer GinkgoRecover()
-				Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
-			}()
+			defer runPromptInBg(ctx, prompt).WaitTillDone()
+
 			// wait for setup so that it's safe to send keypresses
 			Eventually(waitForSetup).Should(BeClosed(), "should be safe to send keypresses eventually")
 
 			sendRuneKeys("cheddar\r", prompt)
+			<-pulse
 			sendRuneKeys("monterey jack\r", prompt)
 
 			Eventually(screen).Should(DisplayLike(50, 10,
@@ -405,26 +403,31 @@ var _ = Describe("The Prompt widget", func() {
 		})
 
 		It("should continue presenting prompts & output until asked to stop, then shutdown the screen", func() {
+			// go-prompt eagerly consumes input then discards anything after
+			// the first \r, so wait till we get a new prompt between inputs
+			// like a real user would
+			pulse := make(chan struct{}, 10) 
 			cnt := 0
 			prompt.HandleInput = func(_ string) (text *string, stop bool) {
 				cnt++
 				txt := fmt.Sprintf("count: %d\n", cnt)
+				pulse <- struct{}{}
 				if cnt < 3 {
 					return &txt, false
 				}
 				return &txt, true
 			}
 
-			go func() {
-				defer GinkgoRecover()
-				Expect(prompt.Run(ctx, nil, cancel)).To(Succeed())
-			}()
+			defer runPromptInBg(ctx, prompt).WaitTillDone()
 			// wait for setup so that it's safe to send keypresses
 			Eventually(waitForSetup).Should(BeClosed(), "should be safe to send keypresses eventually")
 
 			sendRuneKeys("cheddar\r", prompt)
+			<-pulse
 			sendRuneKeys("monterey jack\r", prompt)
+			<-pulse
 			sendRuneKeys("parmesean\r", prompt)
+			<-pulse
 			sendRuneKeys("\r", prompt)
 
 			Eventually(screen).Should(DisplayLike(50, 10,
@@ -438,3 +441,29 @@ var _ = Describe("The Prompt widget", func() {
 		})
 	})
 })
+
+func runPromptInBg(ctx context.Context, prompt *term.PromptView) *promptWaiter {
+	ctx, cancel := context.WithCancel(ctx)
+
+	doneCh := make(chan struct{})
+	go func() {
+		defer GinkgoRecover()
+		defer close(doneCh)
+		ExpectWithOffset(1, prompt.Run(ctx, nil, cancel)).To(Succeed())
+	}()
+
+	return &promptWaiter{
+		doneCh: doneCh,
+		cancel: cancel,
+	}
+}
+
+type promptWaiter struct {
+	doneCh <-chan struct{}
+	cancel context.CancelFunc
+}
+
+func (w *promptWaiter) WaitTillDone() {
+	w.cancel()
+	EventuallyWithOffset(1, w.doneCh).Should(BeClosed())
+}

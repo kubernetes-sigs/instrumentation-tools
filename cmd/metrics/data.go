@@ -25,9 +25,15 @@ import (
 	"sigs.k8s.io/instrumentation-tools/promq/term/plot"
 )
 
+// TODO: this practically has no reason to be an interface any more, and we can
+// probably save space by making it not one
+
 // TODO(sollyross): can we make this more efficient with prometheus return data?  do we need to?
 type PromSeriesSet promql.Matrix
 
+// PromResultToPromSeriesSet copies res and converts it to a format suitable
+// for use with the terminal plotting library.  It copies since query results
+// are generally not usable beyond the lifetime of the query.
 func PromResultToPromSeriesSet(res *promql.Result) (plot.SeriesSet, error) {
 	if res.Err != nil {
 		return nil, res.Err
@@ -38,38 +44,53 @@ func PromResultToPromSeriesSet(res *promql.Result) (plot.SeriesSet, error) {
 	}
 
 	set := make(plot.SeriesSet, len(rawSeriesSet))
-	for i, series := range rawSeriesSet {
-		set[i] = &PromSeries{Series: series}
+	for i, origSeries := range rawSeriesSet {
+		var title string
+		{
+			sb := &strings.Builder{}
+			for i, lbl := range origSeries.Metric {
+				if i != 0 {
+					sb.WriteString(", ")
+				}
+				sb.WriteString(lbl.Value)
+			}
+			title = sb.String()
+		}
+
+		// TODO: this is stable, but not guaranteed to be unique
+		id :=  plot.SeriesId(origSeries.Metric.Hash() % 255 + 1)
+
+		series := &PromSeries{
+			title: title,
+			id: id,
+		}
+
+		series.points = make([]plot.Point, len(origSeries.Points))
+		for i, point := range origSeries.Points {
+			series.points[i] = PromPoint(point)
+		}
+
+		set[i] = series
 	}
 
 	return set, nil
 }
 
 type PromSeries struct {
-	promql.Series
+	title string
+	id plot.SeriesId
+	points []plot.Point
 }
 
 func (s *PromSeries) Title() string {
-	sb := &strings.Builder{}
-	for i, lbl := range s.Metric {
-		if i != 0 {
-			sb.WriteString(", ")
-		}
-		sb.WriteString(lbl.Value)
-	}
-	return sb.String()
+	return s.title
 }
 func (s *PromSeries) Id() plot.SeriesId {
-	// TODO: this is stable, but not guaranteed to be unique
-	return plot.SeriesId(s.Metric.Hash() % 255 + 1)
+	return s.id
 }
 
 func (s *PromSeries) Points() []plot.Point {
-	res := make([]plot.Point, len(s.Series.Points))
-	for i, pt := range s.Series.Points {
-		res[i] = PromPoint(pt)
-	}
-	return res
+	return s.points
 }
 
 type PromPoint promql.Point
