@@ -63,6 +63,9 @@ func ParseTextDataWithAdditionalLabels(data []byte, nowish time.Time, ls map[str
 			} else {
 				timestamp = nowAbouts
 			}
+
+			// TODO(directxman12): seems like this is a rather big allocation, would
+			// be nice if we could cut down on this
 			lb := labels.NewBuilder(res)
 
 			for k, v := range ls {

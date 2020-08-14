@@ -117,6 +117,9 @@ func EvenlySpacedTicks(graph *PlatonicGraph, outerSize ScreenSize, scale TickSca
 		if platRngInc == 0 {
 			platRngInc = graph.RangeMax // just two ticks
 		}
+		if platRngInc == 0 { // in case (graph.RangeMax - graph.RangeMin) == 0
+			platRngInc = 1
+		}
 		for x := graph.RangeMin; x <= graph.RangeMax; x += platRngInc {
 			platRngTicks = append(platRngTicks, x)
 		}
