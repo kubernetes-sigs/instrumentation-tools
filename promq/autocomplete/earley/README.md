@@ -65,11 +65,44 @@ Given the factors at play, we converged around using an [earley chart parser
 
 #### Earley algorithm
 
-todo(YoyinZyc)
+There are some key terms in earley algorithm.
+1. Terminal and non-terminal symbols: In promql.go, we defined a lot of terminal and non-terminal symbols. 
+They are the lexical elements used in specifying the grammar rules(production rules). 
+Terminal symbols are the elementary symbols of the grammar. 
+Non-terminal symbols can be replaced by groups of terminal symbols according to the grammar rules.
+2. Grammar rule: In promql.go, we also defined the grammar rules. The left of the rules can be replaced by the right. 
+There is one root rule which is the start point for any input string.
+3. Input position: The parser will the parse the input string from left to right and step by step. 
+It will start from the position prior to the input string which is the position 0. 
+The last position is the position after the last token.
+4. State set: For every input position, the parser generates a state set. The state set at input position k is called S(k).
+A state set is composed by a list of state. `EarleyItem` in item.go represent a single state.
+Each state is a tuple (X -> a  •  b, i):
+    - The dot represents the input position. Here the dot is at position 1.
+    - The state applies rule X -> ab
+    - i is the origin position where the the matching of the production began.
+5. Chart: Chart records the state set of each position. The length of earley chart is `len(input_string) + 1`
+
+Earley parser starts from position 0 with root grammar rule and then repeatedly executes three operations: prediction, scanning and completion:
+- Prediction: For every state in S(k) of the form (X → α • Y β, j) (where j is the origin position as above), add (Y → • γ, k) to S(k) for every production in the grammar with Y on the left-hand side (Y → γ).
+- Scanning: If a is the next symbol in the input stream, for every state in S(k) of the form (X → α • a β, j), add (X → α a • β, j) to S(k+1).
+- Completion: For every state in S(k) of the form (Y → γ •, j), find all states in S(j) of the form (X → α • Y β, i) and add (X → α Y • β, i) to S(k).
+
+Only new items will be added to state set. Two states with same rule, dot position and origin position will be viewed as duplicate states.
+
+We use the last state(the dot is at the end of input string) to generate completion suggestion. In each unfinished state(there are tokens after dot) of the state set, 
+if the symbol after dot is a terminal, then it is a potential suggestion. The suggestion generated from earley algorithm is a suggested token type. 
+There is a mapping in `completer.go` which matches type to real suggested string.
 
 #### Incremental parsing
 
-todo(logicalhan)
+Earley parser can have poor runtime sometimes. To optimize, we will not parse input string every time from beginning. 
+For example, if the previous input is 
+`sum(metric_name_one{` and the current input is `sum(metric_name_one)`, 
+parser will keep the previous states that cover `sum(metric_name_one` and start parsing from the next one. Even if the previous input and new input are different from the first token, 
+the first state set can be reused because the first input position is always prior to the input string. 
+
+This incremental parsing is really practical because user keeps inputting word by word and the later state set can always build on top of previous state sets.
 
 ## Considered Alternatives
 
