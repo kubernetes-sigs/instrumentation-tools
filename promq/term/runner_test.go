@@ -57,6 +57,37 @@ func (v *oneRuneView) GetBox() term.PositionBox {
 	return v.pos
 }
 
+// threadSafeishScreen is a simulation screen that has a lock over show, so we
+// don't race with GetContents in our checkers (which know how to use
+// WithScreen).
+type threadSafeishScreen struct {
+	mu sync.Mutex
+	tcell.SimulationScreen
+}
+
+// WithScreen provides threadsafe access to the underlying SimulationScreen.
+// The SimulationScreen passed to the callback is not valid beyond the body of
+// the callback.
+func (s *threadSafeishScreen) WithScreen(cb func(tcell.SimulationScreen)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cb(s.SimulationScreen)
+}
+
+// Show shows the screen.
+func (s *threadSafeishScreen) Show() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.SimulationScreen.Show()
+}
+
+// Fini marks this as done.
+func (s *threadSafeishScreen) Fini() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.SimulationScreen.Fini()
+}
+
 // waitForPollingStart waits for the runner to start polling, since tcell silently
 // drops events until something is polling.
 func waitForPollingStart(screen tcell.SimulationScreen, keys <-chan *tcell.EventKey) {
@@ -72,7 +103,7 @@ func waitForPollingStart(screen tcell.SimulationScreen, keys <-chan *tcell.Event
 }
 var _ = Describe("The overall Runner", func() {
 	var (
-		screen tcell.SimulationScreen
+		screen *threadSafeishScreen
 		cancel context.CancelFunc
 		keys chan *tcell.EventKey
 		done chan struct{}
@@ -81,7 +112,7 @@ var _ = Describe("The overall Runner", func() {
 		initialView term.View
 	)
 	BeforeEach(func() {
-		screen = tcell.NewSimulationScreen("")
+		screen = &threadSafeishScreen{SimulationScreen: tcell.NewSimulationScreen("")}
 		initialView = mainView
 	})
 	JustBeforeEach(func() {
