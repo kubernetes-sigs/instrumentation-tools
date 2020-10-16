@@ -21,6 +21,7 @@ import (
 	"time"
 	"fmt"
 	"sync"
+	"os"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -92,6 +93,10 @@ var _ = Describe("The Prompt widget", func() {
 		cancel context.CancelFunc
 	)
 	BeforeEach(func() {
+		if _, err := os.Open("/dev/tty"); err != nil {
+			Skip("there's a weird bug in go-prompt where it always tries to initialize a tty parser, so skip if we don't have one")
+		}
+
 		rawScreen := tcell.NewSimulationScreen("")
 		rawScreen.Init()
 		rawScreen.SetSize(50, 10)
