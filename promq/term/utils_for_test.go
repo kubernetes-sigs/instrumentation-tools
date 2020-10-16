@@ -81,12 +81,6 @@ func (m *cellsMatcher) Match(actual interface{}) (bool, error) {
 	}
 	
 	switch actual := actual.(type) {
-	case term.Flushable:
-		actualCells := m.onScreenAsCells(actual)
-		return m.matchWithContents(actualCells)
-	case tcell.SimulationScreen:
-		actualCells, _, _ := actual.GetContents()
-		return m.matchWithContents(actualCells)
 	case LockableScreen:
 		var matches bool
 		var err error
@@ -95,6 +89,12 @@ func (m *cellsMatcher) Match(actual interface{}) (bool, error) {
 			matches, err = m.matchWithContents(actualCells)
 		})
 		return matches, err
+	case term.Flushable:
+		actualCells := m.onScreenAsCells(actual)
+		return m.matchWithContents(actualCells)
+	case tcell.SimulationScreen:
+		actualCells, _, _ := actual.GetContents()
+		return m.matchWithContents(actualCells)
 	default:
 		expectedCells, _, _ := m.expected.GetContents()
 		return reflect.DeepEqual(expectedCells, actual), nil
@@ -105,6 +105,8 @@ func (m *cellsMatcher) FailureMessage(actual interface{}) string {
 	var withScreen func(func(tcell.SimulationScreen))
 
 	switch actual := actual.(type) {
+	case LockableScreen:
+		withScreen = actual.WithScreen
 	case term.Flushable:
 		actualScreen := m.onScreen(actual)
 		withScreen = func(cb func(tcell.SimulationScreen)) {
@@ -114,8 +116,6 @@ func (m *cellsMatcher) FailureMessage(actual interface{}) string {
 		 withScreen = func(cb func(tcell.SimulationScreen)) {
 			cb(actual)
 		}
-	case LockableScreen:
-		withScreen = actual.WithScreen
 	default:
 		return format.Message(actual, "to equal", displayCells(m.expected))
 	}
@@ -135,6 +135,8 @@ func (m *cellsMatcher) NegatedFailureMessage(actual interface{}) string {
 	var withScreen func(func(tcell.SimulationScreen))
 
 	switch actual := actual.(type) {
+	case LockableScreen:
+		withScreen = actual.WithScreen
 	case term.Flushable:
 		actualScreen := m.onScreen(actual)
 		withScreen = func(cb func(tcell.SimulationScreen)) {
@@ -144,8 +146,6 @@ func (m *cellsMatcher) NegatedFailureMessage(actual interface{}) string {
 		withScreen = func(cb func(tcell.SimulationScreen)) {
 			cb(actual)
 		}
-	case LockableScreen:
-		withScreen = actual.WithScreen
 	default:
 		return format.Message(actual, "not to equal", displayCells(m.expected))
 	}
