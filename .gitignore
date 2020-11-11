@@ -1,3 +1,32 @@
+# editor files
+*.iml
+.idea
+*.swp
+*.swo
+*~
+
+
+/Godeps/_workspace
+/bazel-*
+/_artifacts/
+
+# This is where the result of the go build goes
+/output*/
+/_output*/
+/_output
+
+# OSX trash
+.DS_Store
+
+# Eclipse files
+.classpath
+.project
+.settings/**
+
+# vim
+*.swp
+*~
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -11,8 +40,3 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# editor stuff
-.idea
-*.swp
-*.swo
-*~
