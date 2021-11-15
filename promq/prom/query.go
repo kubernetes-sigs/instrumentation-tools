@@ -19,6 +19,7 @@ package prom
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/prometheus/tsdb/chunkenc"
 	"math"
 	"sort"
 
@@ -166,11 +167,11 @@ type memQuerier struct {
 	storage *rangeStorage
 }
 
-func (q *memQuerier) SelectSorted(_ *storage.SelectParams, _ ...*labels.Matcher) (storage.SeriesSet, storage.Warnings, error) {
+func (q *memQuerier) SelectSorted(_ ...*labels.Matcher) (storage.SeriesSet, storage.Warnings, error) {
 	panic("fix me")
 }
 
-func (q *memQuerier) Select(_ *storage.SelectParams, matchers ...*labels.Matcher) (storage.SeriesSet, storage.Warnings, error) {
+func (q *memQuerier) Select(sortSeries bool, hints *storage.SelectHints, matchers ...*labels.Matcher) storage.SeriesSet {
 	// we ignore hints b/c they're mostly just an optimization over large datasets
 
 	// TODO(sollyross): we can use tricks from tsdb/querier to optimize a bit
@@ -206,21 +207,31 @@ func (q *memQuerier) Select(_ *storage.SelectParams, matchers ...*labels.Matcher
 	}
 
 	finalPostings := index.Intersect(sets...)
-	return q.newSeriesSet(finalPostings), nil, nil
+	return q.newSeriesSet(finalPostings)
 }
 
-func (q *memQuerier) LabelValues(name string) ([]string, storage.Warnings, error) {
+func (q *memQuerier) LabelValues(name string, matchers ...*labels.Matcher) ([]string, storage.Warnings, error) {
 	// doesn't look like we need to error on missing label from the prom implementations
 	var res []string
 	q.storage.postings.IterValues(name, func(val string) {
+		for _, matcher := range matchers {
+			if !matcher.Matches(name) {
+				return
+			}
+		}
 		res = append(res, val)
 	})
 	return res, nil, nil
 }
 
-func (q *memQuerier) LabelNames() ([]string, storage.Warnings, error) {
+func (q *memQuerier) LabelNames(matchers ...*labels.Matcher) ([]string, storage.Warnings, error) {
 	var res []string
 	q.storage.postings.IterNames(func(name string) {
+		for _, matcher := range matchers {
+			if !matcher.Matches(name) {
+				return
+			}
+		}
 		res = append(res, name)
 	})
 	return res, nil, nil
@@ -241,6 +252,10 @@ func (q *memQuerier) newSeriesSet(postings index.Postings) *seriesSet {
 type seriesSet struct {
 	postings index.Postings
 	storage  *rangeStorage
+}
+
+func (s *seriesSet) Warnings() storage.Warnings {
+	return nil
 }
 
 func (s *seriesSet) Next() bool {
@@ -264,7 +279,7 @@ type blockSeries struct {
 	ind   int
 }
 
-func (s *blockSeries) Iterator() storage.SeriesIterator {
+func (s *blockSeries) Iterator() chunkenc.Iterator {
 	return s
 }
 func (s *blockSeries) Labels() labels.Labels {
