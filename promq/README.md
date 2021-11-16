@@ -49,5 +49,5 @@ We use a standard go build to build from source code. You will want to move the 
 path. Assuming you have a `~/bin` directory in your `PATH`, the build would look like this:
  
 ```bash
-go build promq.go && cp promq ~/bin 
+go build -o ~/bin/promq promq.go
 ```
