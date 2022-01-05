@@ -19,10 +19,9 @@ package earley
 
 import (
 	"fmt"
+	"github.com/prometheus/prometheus/promql/parser"
 	"sigs.k8s.io/instrumentation-tools/notstdlib/sets"
 	"strings"
-
-	"github.com/prometheus/prometheus/promql"
 
 	"sigs.k8s.io/instrumentation-tools/debug"
 )
@@ -141,13 +140,13 @@ type Tokhan struct {
 	StartPos int
 	EndPos   int
 	Type     TokenType
-	ItemType promql.ItemType
+	ItemType parser.ItemType
 	Val      string
 	_index   int
 }
 
 func (t Tokhan) isEof() bool {
-	return t.ItemType == promql.EOF
+	return t.ItemType == parser.EOF
 }
 
 func (t Tokhan) String() string {
@@ -173,12 +172,12 @@ func extractWords(query string) Tokens {
 // todo(cont):  not fond of the way this lexer encodes random syntactical
 // todo(cont):  rules during lexing
 func extractTokensWithOffset(query string, offset int) (words Tokens) {
-	l := promql.Lex(query)
+	l := parser.Lex(query)
 	i := 0
 	for {
-		currItem := promql.Item{}
+		currItem := parser.Item{}
 		l.NextItem(&currItem)
-		if currItem.Typ == promql.EOF {
+		if currItem.Typ == parser.EOF {
 			words = append(words, createTokenFromItem(currItem, offset))
 			break
 		}
@@ -187,7 +186,7 @@ func extractTokensWithOffset(query string, offset int) (words Tokens) {
 		// strings like `start(label='value)end` where we want as output:
 		// a linked list of tokens like this:
 		// "start" <-> "(" <-> "label" <-> "=" <-> "'value" <-> ")" <-> "end"
-		if currItem.Typ == promql.ERROR {
+		if currItem.Typ == parser.ERROR {
 			substring := query[currItem.Pos:]
 			// we're recursing and found an error already abort
 			if i == 0 {
@@ -205,7 +204,7 @@ func extractTokensWithOffset(query string, offset int) (words Tokens) {
 	return
 }
 
-func createTokenFromItem(item promql.Item, offset int) Tokhan {
+func createTokenFromItem(item parser.Item, offset int) Tokhan {
 	return Tokhan{
 		Val:      item.Val,
 		ItemType: item.Typ,
@@ -215,58 +214,58 @@ func createTokenFromItem(item promql.Item, offset int) Tokhan {
 	}
 }
 
-func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
+func mapParserItemTypeToTokhanType(item parser.Item) TokenType {
 	t := item.Typ
 	switch {
-	case t == promql.BY, t == promql.WITHOUT:
+	case t == parser.BY, t == parser.WITHOUT:
 		return AGGR_KW
-	case t == promql.OFFSET:
+	case t == parser.OFFSET:
 		return OFFSET_KW
-	case t == promql.BOOL:
+	case t == parser.BOOL:
 		return BOOL_KW
-	case t == promql.GROUP_LEFT, t == promql.GROUP_RIGHT:
+	case t == parser.GROUP_LEFT, t == parser.GROUP_RIGHT:
 		return GROUP_SIDE
-	case t == promql.IGNORING, t == promql.ON:
+	case t == parser.IGNORING, t == parser.ON:
 		return GROUP_KW
-	case t == promql.EOF:
+	case t == parser.EOF:
 		return EOF
-	case t == promql.STRING:
+	case t == parser.STRING:
 		return STRING
 	case isAggregator(t):
 		return AGGR_OP
-	case t == promql.METRIC_IDENTIFIER:
+	case t == parser.METRIC_IDENTIFIER:
 		return METRIC_ID
 	case isScalarFunction(item):
 		return FUNCTION_SCALAR_ID
 	case isVectorFunction(item):
 		return FUNCTION_VECTOR_ID
-	case t == promql.IDENTIFIER:
+	case t == parser.IDENTIFIER:
 		return ID
-	case t == promql.LEFT_BRACE:
+	case t == parser.LEFT_BRACE:
 		return LEFT_BRACE
-	case t == promql.RIGHT_BRACE:
+	case t == parser.RIGHT_BRACE:
 		return RIGHT_BRACE
-	case t == promql.LEFT_PAREN:
+	case t == parser.LEFT_PAREN:
 		return LEFT_PAREN
-	case t == promql.RIGHT_PAREN:
+	case t == parser.RIGHT_PAREN:
 		return RIGHT_PAREN
-	case t == promql.LEFT_BRACKET:
+	case t == parser.LEFT_BRACKET:
 		return LEFT_BRACKET
-	case t == promql.RIGHT_BRACKET:
+	case t == parser.RIGHT_BRACKET:
 		return RIGHT_BRACKET
-	case t == promql.DURATION:
+	case t == parser.DURATION:
 		return DURATION
-	case t == promql.ADD, t == promql.SUB, t == promql.MUL, t == promql.DIV, t == promql.MOD, t == promql.POW:
+	case t == parser.ADD, t == parser.SUB, t == parser.MUL, t == parser.DIV, t == parser.MOD, t == parser.POW:
 		return ARITHMETIC
-	case t == promql.LAND, t == promql.LOR, t == promql.LUNLESS:
+	case t == parser.LAND, t == parser.LOR, t == parser.LUNLESS:
 		return SET
 	case isOperator(t):
 		return OPERATOR
-	case t == promql.COMMA:
+	case t == parser.COMMA:
 		return COMMA
-	case t == promql.COLON:
+	case t == parser.COLON:
 		return COLON
-	case t == promql.NUMBER:
+	case t == parser.NUMBER:
 		return NUM
 	default:
 		return UNKNOWN
@@ -275,15 +274,15 @@ func mapParserItemTypeToTokhanType(item promql.Item) TokenType {
 
 // need to explicitly extract this function since it's private
 // in prometheus 2.16
-func isAggregator(item promql.ItemType) bool {
-	return item > 57386 && item < 57398
+func isAggregator(item parser.ItemType) bool {
+	return item > 57388 && item < 57401
 }
 
-func isOperator(item promql.ItemType) bool {
-	return item > 57367 && item < 57385
+func isOperator(item parser.ItemType) bool {
+	return item == parser.EQL || (item > 57367 && item < 57387)
 }
 
-func isScalarFunction(item promql.Item) bool {
+func isScalarFunction(item parser.Item) bool {
 	for _, v := range sets.StringKeySet(scalarFunctions).List() {
 		if v == item.Val {
 			return true
@@ -292,7 +291,7 @@ func isScalarFunction(item promql.Item) bool {
 	return false
 }
 
-func isVectorFunction(item promql.Item) bool {
+func isVectorFunction(item parser.Item) bool {
 	for _, v := range sets.StringKeySet(vectorFunctions).List() {
 		if v == item.Val {
 			return true

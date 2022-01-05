@@ -19,6 +19,7 @@ package prom
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/prometheus/promql/parser"
 	"sync"
 	"time"
 
@@ -66,7 +67,7 @@ func (q *PeriodicData) SetQuery(ctx context.Context, query string) error {
 	q.queryMu.Lock()
 	defer q.queryMu.Unlock()
 	// let's validate that the querystring is parseable
-	_, err := promql.ParseExpr(query)
+	_, err := parser.ParseExpr(query)
 	if err != nil {
 		return err
 	}
