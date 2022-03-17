@@ -19,6 +19,7 @@ package prom
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/golang/protobuf/proto"
@@ -104,6 +105,48 @@ func ToPrettyFormat(res *promql.Result, outputType string, colorized bool) (*str
 			return nil, err
 		}
 		return o, nil
+	case "prometheus":
+		o, err := ToPrometheusFormat(res)
+		if err != nil {
+			return nil, err
+		}
+		return o, nil
 	}
+
 	return nil, fmt.Errorf("unsupported formatting option (%s)", outputType)
+}
+
+func ToPrometheusFormat(result *promql.Result) (*string, error) {
+	if result.Err != nil {
+		return nil, result.Err
+	}
+	if result.Warnings != nil {
+		for _, e := range result.Warnings {
+			fmt.Println(e)
+		}
+	}
+
+	// Non vector result types cannot be formatted nicely yet,
+	// so we use the built-in String() method for those.
+	vector, ok := result.Value.(promql.Vector)
+	if !ok {
+		return proto.String(result.String()), nil
+	}
+
+	var lines []string
+	for _, sample := range vector {
+		var line string
+
+		metricName := sample.Metric.MatchLabels(true, "__name__")
+		if len(metricName) != 0 {
+			line = metricName[0].Value
+		}
+		sample.Metric = sample.Metric.WithoutLabels("__name__")
+
+		line += sample.String()
+		lines = append(lines, line)
+	}
+
+	output := strings.Join(lines, "\n")
+	return proto.String(output), nil
 }
