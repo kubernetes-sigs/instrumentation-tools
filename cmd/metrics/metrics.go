@@ -31,8 +31,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/gdamore/tcell"
 	_ "github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/prometheus/pkg/labels"
-	promtime "github.com/prometheus/prometheus/pkg/timestamp"
+	"github.com/prometheus/prometheus/model/labels"
+	promtime "github.com/prometheus/prometheus/model/timestamp"
 	"github.com/prometheus/prometheus/promql"
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -308,14 +308,14 @@ func (c *MetricsCommand) runInteractiveChart(ctx context.Context, runner *prom.P
 		}
 		return &term.SplitView{
 			DockSize: 9,
-			Dock: term.PosBelow,
-			Docked: promptView,
+			Dock:     term.PosBelow,
+			Docked:   promptView,
 			Flexed: &term.SplitView{
 				Docked: keyView,
 				Flexed: graphView,
 
-				Dock: term.PosLeft,
-				DockSize: keySize,
+				Dock:           term.PosLeft,
+				DockSize:       keySize,
 				DockMaxPercent: 20,
 			},
 		}
@@ -355,7 +355,7 @@ func (c *MetricsCommand) runInteractiveChart(ctx context.Context, runner *prom.P
 				return &msg, false
 			}
 			axesMu.Lock()
-			lastAxes = plot.AutoAxes()  // reset the axes when we change query
+			lastAxes = plot.AutoAxes() // reset the axes when we change query
 			axesMu.Unlock()
 
 			msg := fmt.Sprintf("Plotting %q...\n", input)

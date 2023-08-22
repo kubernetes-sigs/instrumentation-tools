@@ -19,7 +19,7 @@ package prom
 import (
 	"sync"
 
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/labels"
 
 	debug "sigs.k8s.io/instrumentation-tools/debug/error"
 	"sigs.k8s.io/instrumentation-tools/notstdlib/sets"

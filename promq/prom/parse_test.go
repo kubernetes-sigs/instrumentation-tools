@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/labels"
 )
 
 func TestParseTextDataWithAdditionalLabels(t *testing.T) {

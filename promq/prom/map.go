@@ -14,7 +14,7 @@
 package prom
 
 import (
-	"github.com/prometheus/prometheus/pkg/labels"
+	"github.com/prometheus/prometheus/model/labels"
 )
 
 type seriesRef struct {
